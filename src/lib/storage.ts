@@ -1,4 +1,4 @@
-import { emptyState, CARD_COLORS, COMPANY_CATEGORIES, FIXED_ICONS, iconForCategory, PAYMENT_METHODS, PEOPLE, SPEND_CATEGORIES, type AppState, type CardColorId, type CompanyDirection, type FixedIconId, type IncomeSource, type PaymentMethod, type Person, type SpendingCategory } from './types.ts'
+import { emptyState, CARD_COLORS, COMPANY_CATEGORIES, FIXED_ICONS, iconForCategory, PAYMENT_METHODS, PEOPLE, SPEND_CATEGORIES, type AppState, type CardColorId, type CompanyDirection, type FixedIconId, type GroceryInflow, type IncomeSource, type PaymentMethod, type Person, type SpendingCategory } from './types.ts'
 
 const KEY = 'casa-clara.v1'
 const spendIds = new Set<string>(SPEND_CATEGORIES.map((item) => item.id))
@@ -148,6 +148,24 @@ export function sanitize(input: unknown): AppState | null {
                 date: /^\d{4}-\d{2}-\d{2}$/.test(text(item.date)) ? text(item.date) : '2026-01-01',
                 category,
                 method: (methodIds.has(text(item.method)) ? item.method : 'pix') as PaymentMethod,
+              },
+            ]
+          })
+      : [],
+    groceryInflows: Array.isArray(source.groceryInflows)
+      ? source.groceryInflows
+          .filter((item) => item && typeof item === 'object' && typeof item.id === 'string')
+          .flatMap((item): GroceryInflow[] => {
+            const amount = numberOrNull(item.amount)
+            const month = text(item.month)
+            if (amount == null || amount <= 0 || !/^\d{4}-\d{2}$/.test(month)) return []
+            return [
+              {
+                id: item.id,
+                name: text(item.name).trim() || 'Vale alimentação',
+                amount,
+                month,
+                repeat: item.repeat === 'once' ? 'once' : 'monthly',
               },
             ]
           })

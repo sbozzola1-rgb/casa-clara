@@ -142,11 +142,22 @@ export function limitUsed(card: CreditCard, state: AppState, today: Date): numbe
   return round2(total)
 }
 
-export function groceryGoal(state: AppState, month: string): { amount: number | null; override: boolean } {
-  if (Object.prototype.hasOwnProperty.call(state.goals.groceryByMonth, month)) {
-    return { amount: state.goals.groceryByMonth[month] ?? null, override: true }
-  }
-  return { amount: state.goals.groceryMonthlyDefault, override: false }
+export function groceryInflowApplies(item: { month: string; repeat: 'monthly' | 'once' }, month: string): boolean {
+  if (!/^\d{4}-\d{2}$/.test(item.month)) return false
+  if (item.repeat === 'once') return item.month === month
+  return item.month <= month
+}
+
+export function groceryGoal(state: AppState, month: string): { amount: number | null; override: boolean; base: number | null; inflowTotal: number } {
+  const override = Object.prototype.hasOwnProperty.call(state.goals.groceryByMonth, month)
+  const base = override ? (state.goals.groceryByMonth[month] ?? null) : state.goals.groceryMonthlyDefault
+  const inflowTotal = round2(
+    (state.groceryInflows ?? [])
+      .filter((item) => groceryInflowApplies(item, month))
+      .reduce((sum, item) => sum + item.amount, 0),
+  )
+  const amount = base == null && inflowTotal <= 0 ? null : round2((base ?? 0) + inflowTotal)
+  return { amount, override, base, inflowTotal }
 }
 
 export function spendEntries(state: AppState, category: 'mercado' | 'lazer'): SpendEntry[] {

@@ -18,6 +18,7 @@ import {
   type CreditCard,
   type FixedExpense,
   type FixedIconId,
+  type GroceryInflow,
   type IncomeRepeat,
   type IncomeSource,
   type PaymentMethod,
@@ -656,6 +657,109 @@ export function SpendDialog({
           onClose={() => setConfirming(false)}
           onConfirm={() => {
             removeSpend(entry)
+            onClose()
+          }}
+        />
+      ) : null}
+    </>
+  )
+}
+
+export function GroceryInflowDialog({ month, entry, onClose }: { month: string; entry: GroceryInflow | null; onClose: () => void }) {
+  const { upsertGroceryInflow, removeGroceryInflow } = useStore()
+  const [name, setName] = useState(entry?.name ?? 'Vale alimentação')
+  const [amount, setAmount] = useState(entry ? formatInput(entry.amount) : '')
+  const [repeat, setRepeat] = useState<'monthly' | 'once'>(entry?.repeat ?? 'once')
+  const [error, setError] = useState('')
+  const [confirming, setConfirming] = useState(false)
+
+  const save = () => {
+    const parsed = parseMoney(amount)
+    if (!name.trim()) {
+      setError('Diga de onde veio, por exemplo vale alimentação.')
+      return
+    }
+    if (parsed == null || parsed <= 0) {
+      setError('Informe o valor.')
+      return
+    }
+    upsertGroceryInflow({
+      id: entry?.id ?? uid(),
+      name: name.trim(),
+      amount: parsed,
+      month: entry?.month ?? month,
+      repeat,
+    })
+    onClose()
+  }
+
+  return (
+    <>
+      <Modal
+        title={entry ? 'Editar fonte de entrada' : 'Fonte de entrada'}
+        description="Esse valor entra na meta de mercado do mês. A compra em si continua sendo lançada à parte."
+        onClose={onClose}
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {entry ? (
+              <Button variant="danger" onClick={() => setConfirming(true)}>
+                Excluir
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-3">
+              <Button variant="ghost" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button onClick={save}>Salvar</Button>
+            </div>
+          </div>
+        }
+      >
+        <form
+          className="space-y-4 pb-2"
+          onSubmit={(event) => {
+            event.preventDefault()
+            save()
+          }}
+        >
+          <Field label="Nome">
+            <input autoFocus className={fieldClass} value={name} onChange={(event) => setName(event.target.value)} placeholder="Vale alimentação" />
+          </Field>
+          <MoneyField label="Valor" value={amount} onChange={setAmount} />
+          <div>
+            <span className="mb-1.5 block text-sm font-medium text-ink">Quando entra</span>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                aria-pressed={repeat === 'once'}
+                onClick={() => setRepeat('once')}
+                className={`rounded-xl border px-3 py-2.5 text-sm ${repeat === 'once' ? 'border-moss bg-[#e5f2eb] text-moss' : 'border-line bg-white'}`}
+              >
+                Só neste mês
+              </button>
+              <button
+                type="button"
+                aria-pressed={repeat === 'monthly'}
+                onClick={() => setRepeat('monthly')}
+                className={`rounded-xl border px-3 py-2.5 text-sm ${repeat === 'monthly' ? 'border-moss bg-[#e5f2eb] text-moss' : 'border-line bg-white'}`}
+              >
+                Todo mês
+              </button>
+            </div>
+          </div>
+          {error ? <p className="text-sm text-clay">{error}</p> : null}
+        </form>
+      </Modal>
+      {confirming && entry ? (
+        <ConfirmDialog
+          title="Excluir entrada"
+          text={`“${entry.name}” sai da meta de mercado.`}
+          confirmLabel="Excluir"
+          onClose={() => setConfirming(false)}
+          onConfirm={() => {
+            removeGroceryInflow(entry.id)
             onClose()
           }}
         />

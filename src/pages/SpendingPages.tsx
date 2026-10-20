@@ -1,20 +1,22 @@
 import { useState } from 'react'
-import { MoneyDialog, SpendDialog } from '../components/dialogs.tsx'
+import { GroceryInflowDialog, MoneyDialog, SpendDialog } from '../components/dialogs.tsx'
 import { BudgetMeter, Button, CompareBars, EmptyState, PageIntro, Panel } from '../components/ui.tsx'
 import { addDays, formatFriendly, monthName, monthRange, monthTitle, startOfWeek, weekTitle } from '../lib/dates.ts'
-import { groceryGoal, grocerySeries, leisureSeries, spentInRange } from '../lib/finance.ts'
+import { groceryGoal, groceryInflowApplies, grocerySeries, leisureSeries, spentInRange } from '../lib/finance.ts'
 import { formatBRL } from '../lib/money.ts'
-import type { SpendEntry } from '../lib/types.ts'
+import type { GroceryInflow, SpendEntry } from '../lib/types.ts'
 import { useStore } from '../state.tsx'
 
 export function GroceryPage() {
   const { state, month, today, page, setPage, setGroceryMonth } = useStore()
   const [dialog, setDialog] = useState<SpendEntry | null | 'new'>(() => (page.id === 'grocery' && page.compose ? 'new' : null))
   const [adjusting, setAdjusting] = useState(false)
+  const [inflow, setInflow] = useState<GroceryInflow | null | 'new'>(null)
   const range = monthRange(month)
   const spent = spentInRange(state, 'mercado', range.start, range.end)
   const goal = groceryGoal(state, month)
   const series = grocerySeries(state, month)
+  const inflows = state.groceryInflows.filter((item) => groceryInflowApplies(item, month))
 
   const close = () => {
     setDialog(null)
@@ -26,7 +28,7 @@ export function GroceryPage() {
       <PageIntro
         eyebrow="Meta mensal"
         title="Mercado"
-        description="Tudo marcado como mercado entra aqui pelo valor cheio, no mês da compra. Dá para ajustar a meta só deste mês sem mexer nos outros."
+        description="As compras entram pelo valor cheio, no mês em que aconteceram. Vale alimentação e outras entradas aumentam a meta desse mês."
         action={<Button onClick={() => setDialog('new')}>Lançar compra</Button>}
       />
 
@@ -34,6 +36,9 @@ export function GroceryPage() {
         <Panel title={monthTitle(month)}>
           <BudgetMeter spent={spent.total} goal={goal.amount} />
           <div className="mt-5 flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => setInflow('new')}>
+              Fonte de entrada
+            </Button>
             <Button variant="secondary" onClick={() => setAdjusting(true)}>
               Ajustar meta de {monthName(month)}
             </Button>
@@ -44,10 +49,23 @@ export function GroceryPage() {
             ) : null}
           </div>
           <p className="mt-4 text-sm leading-relaxed text-ink-soft">
-            {goal.override
-              ? `Este mês está em ${formatBRL(goal.amount ?? 0)}. A meta padrão continua ${state.goals.groceryMonthlyDefault == null ? 'sem valor' : formatBRL(state.goals.groceryMonthlyDefault)}.`
-              : 'Este mês usa a meta padrão. Um ajuste vale só para o mês que está aberto em cima.'}
+            {goalText(goal, state.goals.groceryMonthlyDefault)}
           </p>
+          {inflows.length > 0 ? (
+            <ul className="mt-4 divide-y divide-line border-t border-line">
+              {inflows.map((item) => (
+                <li key={item.id}>
+                  <button type="button" onClick={() => setInflow(item)} className="flex w-full items-center justify-between gap-3 py-3 text-left">
+                    <span>
+                      <span className="block text-sm font-medium">{item.name}</span>
+                      <span className="block text-xs text-ink-soft">{item.repeat === 'monthly' ? 'Todo mês' : 'Só neste mês'}</span>
+                    </span>
+                    <span className="text-sm font-medium tabular-nums">{formatBRL(item.amount)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </Panel>
         <Panel title="Últimos meses">
           <CompareBars items={series.map((item) => ({ key: item.month, label: item.label, spent: item.spent, goal: item.goal }))} />
@@ -64,6 +82,9 @@ export function GroceryPage() {
       </section>
 
       {dialog !== null ? <SpendDialog category="mercado" entry={dialog === 'new' ? null : dialog} onClose={close} /> : null}
+      {inflow !== null ? (
+        <GroceryInflowDialog month={month} entry={inflow === 'new' ? null : inflow} onClose={() => setInflow(null)} />
+      ) : null}
       {adjusting ? (
         <MoneyDialog
           title={`Meta de ${monthName(month)}`}
@@ -173,6 +194,22 @@ function EntryList({
       ))}
     </ul>
   )
+}
+
+function goalText(
+  goal: { amount: number | null; override: boolean; base: number | null; inflowTotal: number },
+  fallback: number | null,
+): string {
+  if (goal.inflowTotal > 0 && goal.base != null) {
+    return `A meta da casa é ${formatBRL(goal.base)}. As entradas somam ${formatBRL(goal.inflowTotal)}, então o mês fica em ${formatBRL(goal.amount ?? 0)}.`
+  }
+  if (goal.inflowTotal > 0) {
+    return `Este mês a meta é a entrada de ${formatBRL(goal.inflowTotal)}.`
+  }
+  if (goal.override) {
+    return `Este mês está em ${formatBRL(goal.amount ?? 0)}. A meta padrão continua ${fallback == null ? 'sem valor' : formatBRL(fallback)}.`
+  }
+  return 'Este mês usa a meta padrão. Um ajuste vale só para o mês que está aberto em cima.'
 }
 
 function formatFriendlyDate(date: Date): string {

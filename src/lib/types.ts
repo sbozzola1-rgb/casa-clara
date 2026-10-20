@@ -127,6 +127,14 @@ export interface Goals {
   groceryByMonth: Record<string, number>
 }
 
+export interface GroceryInflow {
+  id: string
+  name: string
+  amount: number
+  month: string
+  repeat: 'monthly' | 'once'
+}
+
 export const PEOPLE = [
   { id: 'sara', label: 'Sara' },
   { id: 'vinicius', label: 'Vinicius' },
@@ -169,6 +177,7 @@ export interface AppState {
   paidFixed: Record<string, true>
   paidInvoices: Record<string, true>
   goals: Goals
+  groceryInflows: GroceryInflow[]
 }
 
 export interface SpendEntry {
@@ -198,6 +207,7 @@ export function emptyState(): AppState {
       groceryMonthlyDefault: null,
       groceryByMonth: {},
     },
+    groceryInflows: [],
   }
 }
 

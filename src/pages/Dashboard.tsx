@@ -182,7 +182,11 @@ export function Dashboard() {
           }
         >
           <p className="mb-3 text-sm text-ink-soft">
-            {goal.override ? 'Meta ajustada só para este mês.' : 'Usando a meta padrão.'}
+            {goal.inflowTotal > 0
+              ? `Inclui ${formatBRL(goal.inflowTotal)} de entrada, como vale alimentação.`
+              : goal.override
+                ? 'Meta ajustada só para este mês.'
+                : 'Usando a meta padrão.'}
           </p>
           <BudgetMeter spent={grocery.total} goal={goal.amount} />
           <button type="button" onClick={() => setPage({ id: 'grocery' })} className="mt-4 text-sm font-medium text-moss">

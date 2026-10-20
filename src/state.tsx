@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { pullHousehold, pushHousehold, subscribeHousehold } from './lib/cloud.ts'
 import { monthKey } from './lib/dates.ts'
 import { loadState, sanitize, saveState } from './lib/storage.ts'
-import { emptyState, type AppState, type CashExpense, type CompanyEntry, type CreditCard, type FixedExpense, type IncomeSource, type Purchase, type SpendEntry } from './lib/types.ts'
+import { emptyState, type AppState, type CashExpense, type CompanyEntry, type CreditCard, type FixedExpense, type GroceryInflow, type IncomeSource, type Purchase, type SpendEntry } from './lib/types.ts'
 
 export type Page =
   | { id: 'dashboard' }
@@ -41,6 +41,8 @@ interface Store {
   setLeisureWeekly: (value: number | null) => void
   setGroceryDefault: (value: number | null) => void
   setGroceryMonth: (month: string, value: number | null) => void
+  upsertGroceryInflow: (entry: GroceryInflow) => void
+  removeGroceryInflow: (id: string) => void
   replaceState: (input: unknown) => void
 }
 
@@ -286,6 +288,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return { ...current, goals: { ...current.goals, groceryByMonth } }
         })
         notify(value == null ? 'Mês voltou para a meta padrão' : 'Meta do mês ajustada')
+      },
+      upsertGroceryInflow: (entry) => {
+        setState((current) => ({
+          ...current,
+          groceryInflows: current.groceryInflows.some((item) => item.id === entry.id)
+            ? current.groceryInflows.map((item) => (item.id === entry.id ? entry : item))
+            : [...current.groceryInflows, entry],
+        }))
+        notify('Entrada do mercado salva')
+      },
+      removeGroceryInflow: (id) => {
+        setState((current) => ({ ...current, groceryInflows: current.groceryInflows.filter((item) => item.id !== id) }))
+        notify('Entrada do mercado removida')
       },
       replaceState: (next: unknown) => {
         const clean = sanitize(next)

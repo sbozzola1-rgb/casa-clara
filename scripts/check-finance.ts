@@ -1,5 +1,5 @@
 import { addMonthsClamped, parseDate, startOfWeek } from '../src/lib/dates.ts'
-import { installmentSchedule, invoiceDueDate, invoiceForCard, invoiceMonthFor, limitUsed, monthFlow, overdueItems, spentInRange } from '../src/lib/finance.ts'
+import { groceryGoal, installmentSchedule, invoiceDueDate, invoiceForCard, invoiceMonthFor, limitUsed, monthFlow, overdueItems, spentInRange } from '../src/lib/finance.ts'
 import { sanitize } from '../src/lib/storage.ts'
 import { emptyState, type AppState, type CreditCard, type Purchase } from '../src/lib/types.ts'
 
@@ -108,5 +108,18 @@ assert(!paid.some((item) => item.month === '2026-10'), 'marcar como pago tira da
 
 const migrated = sanitize({ version: 1, monthlyIncome: 10000, fixedExpenses: [], cards: [], purchases: [], cashExpenses: [], paidFixed: {}, paidInvoices: {}, goals: {} })
 assert(migrated?.incomes.length === 1 && migrated.incomes[0]?.person === 'sara' && migrated.incomes[0]?.amount === 10000, 'renda antiga vira origem da Sara')
+
+const withVale = {
+  ...emptyState(),
+  goals: { ...emptyState().goals, groceryMonthlyDefault: 1500 },
+  groceryInflows: [{ id: 'vale', name: 'Vale alimentação', amount: 400, month: '2026-10', repeat: 'once' as const }],
+}
+assert(groceryGoal(withVale, '2026-10').amount === 1900, 'vale alimentação compõe a meta de outubro')
+assert(groceryGoal(withVale, '2026-11').amount === 1500, 'vale de um mês só não entra no seguinte')
+const valeMensal = {
+  ...withVale,
+  groceryInflows: [{ id: 'vale', name: 'Vale alimentação', amount: 400, month: '2026-10', repeat: 'monthly' as const }],
+}
+assert(groceryGoal(valeMensal, '2026-11').amount === 1900, 'vale mensal continua nos meses seguintes')
 
 console.log('finanças ok')
