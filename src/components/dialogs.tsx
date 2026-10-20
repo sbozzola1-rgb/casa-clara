@@ -1,0 +1,993 @@
+import { useState } from 'react'
+import { formatShort, parseDate, parseDay, todayISO } from '../lib/dates.ts'
+import { ExpenseIcon } from './ExpenseIcon.tsx'
+import { installmentSchedule } from '../lib/finance.ts'
+import { formatBRL, formatInput, parseMoney, uid } from '../lib/money.ts'
+import {
+  CARD_COLORS,
+  COMPANY_CATEGORIES,
+  FIXED_CATEGORIES,
+  FIXED_ICONS,
+  iconForCategory,
+  PAYMENT_METHODS,
+  PEOPLE,
+  SPEND_CATEGORIES,
+  type CashExpense,
+  type CompanyDirection,
+  type CompanyEntry,
+  type CreditCard,
+  type FixedExpense,
+  type FixedIconId,
+  type IncomeRepeat,
+  type IncomeSource,
+  type PaymentMethod,
+  type Person,
+  type Purchase,
+  type SpendEntry,
+  type SpendingCategory,
+} from '../lib/types.ts'
+import { useStore } from '../state.tsx'
+import { ConfirmDialog, Modal } from './Modal.tsx'
+import { Button, Field, MoneyField, fieldClass } from './ui.tsx'
+
+export function MoneyDialog({
+  title,
+  description,
+  label,
+  hint,
+  initial,
+  allowZero = true,
+  onClose,
+  onSave,
+}: {
+  title: string
+  description?: string
+  label: string
+  hint?: string
+  initial: number | null
+  allowZero?: boolean
+  onClose: () => void
+  onSave: (value: number) => void
+}) {
+  const [value, setValue] = useState(initial == null ? '' : formatInput(initial))
+  const [error, setError] = useState('')
+
+  const save = () => {
+    const amount = parseMoney(value)
+    if (amount == null || (!allowZero && amount <= 0)) {
+      setError('Informe um valor válido.')
+      return
+    }
+    onSave(amount)
+    onClose()
+  }
+
+  return (
+    <Modal
+      title={title}
+      description={description}
+      onClose={onClose}
+      footer={
+        <div className="flex flex-wrap justify-end gap-3">
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button onClick={save}>Salvar</Button>
+        </div>
+      }
+    >
+      <form
+        className="space-y-4 pb-2"
+        onSubmit={(event) => {
+          event.preventDefault()
+          save()
+        }}
+      >
+        <MoneyField label={label} value={value} onChange={setValue} hint={hint} autoFocus />
+        {error ? <p className="text-sm text-clay">{error}</p> : null}
+      </form>
+    </Modal>
+  )
+}
+
+export function FixedDialog({ expense, onClose }: { expense: FixedExpense | null; onClose: () => void }) {
+  const { upsertFixed, removeFixed } = useStore()
+  const [name, setName] = useState(expense?.name ?? '')
+  const [amount, setAmount] = useState(expense ? formatInput(expense.amount) : '')
+  const [dueDay, setDueDay] = useState(String(expense?.dueDay ?? 5))
+  const [category, setCategory] = useState(expense?.category ?? 'Aluguel')
+  const [icon, setIcon] = useState<FixedIconId>(expense?.icon ?? iconForCategory(expense?.category ?? 'Aluguel'))
+  const [iconChosen, setIconChosen] = useState(Boolean(expense))
+  const [notes, setNotes] = useState(expense?.notes ?? '')
+  const [active, setActive] = useState(expense?.active ?? true)
+  const [error, setError] = useState('')
+  const [confirming, setConfirming] = useState(false)
+  const options = FIXED_CATEGORIES.includes(category as (typeof FIXED_CATEGORIES)[number])
+    ? FIXED_CATEGORIES
+    : [category, ...FIXED_CATEGORIES]
+
+  const save = () => {
+    const parsedAmount = parseMoney(amount)
+    const day = parseDay(dueDay)
+    if (!name.trim()) {
+      setError('Dê um nome para esse gasto.')
+      return
+    }
+    if (parsedAmount == null || parsedAmount <= 0) {
+      setError('Informe o valor mensal.')
+      return
+    }
+    if (day == null) {
+      setError('O vencimento fica entre os dias 1 e 31.')
+      return
+    }
+    upsertFixed({
+      id: expense?.id ?? uid(),
+      name: name.trim(),
+      amount: parsedAmount,
+      dueDay: day,
+      category,
+      icon,
+      notes: notes.trim(),
+      active,
+    })
+    onClose()
+  }
+
+  return (
+    <>
+      <Modal
+        title={expense ? 'Editar gasto fixo' : 'Novo gasto fixo'}
+        description="Aluguel, luz, escola, internet e tudo que se repete todo mês."
+        onClose={onClose}
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {expense ? (
+              <Button variant="danger" onClick={() => setConfirming(true)}>
+                Excluir
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-3">
+              <Button variant="ghost" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button onClick={save}>Salvar</Button>
+            </div>
+          </div>
+        }
+      >
+        <form
+          className="space-y-4 pb-2"
+          onSubmit={(event) => {
+            event.preventDefault()
+            save()
+          }}
+        >
+          <Field label="Nome">
+            <input autoFocus className={fieldClass} value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Aluguel" />
+          </Field>
+          <MoneyField label="Valor mensal" value={amount} onChange={setAmount} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Dia do vencimento" hint="Se o mês não tiver esse dia, vale o último.">
+              <input className={fieldClass} inputMode="numeric" value={dueDay} onChange={(event) => setDueDay(event.target.value)} />
+            </Field>
+            <Field label="Categoria">
+              <select
+                className={fieldClass}
+                value={category}
+                onChange={(event) => {
+                  const next = event.target.value
+                  setCategory(next)
+                  if (!iconChosen) setIcon(iconForCategory(next))
+                }}
+              >
+                {options.map((item) => (
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <div>
+            <span className="mb-1.5 block text-sm font-medium text-ink">Ícone</span>
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+              {FIXED_ICONS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-label={item.label}
+                  aria-pressed={icon === item.id}
+                  title={item.label}
+                  onClick={() => {
+                    setIcon(item.id)
+                    setIconChosen(true)
+                  }}
+                  className={`flex h-14 flex-col items-center justify-center gap-1 rounded-xl border text-[10px] ${icon === item.id ? 'border-moss bg-[#e5f2eb] text-moss' : 'border-line bg-white text-ink'}`}
+                >
+                  <ExpenseIcon name={item.id} />
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <Field label="Observação">
+            <input className={fieldClass} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Opcional" />
+          </Field>
+          <label className="flex items-center gap-3 text-sm">
+            <input type="checkbox" className="h-4 w-4 accent-moss" checked={active} onChange={(event) => setActive(event.target.checked)} />
+            Entra na conta deste mês
+          </label>
+          {error ? <p className="text-sm text-clay">{error}</p> : null}
+        </form>
+      </Modal>
+      {confirming && expense ? (
+        <ConfirmDialog
+          title="Excluir gasto fixo"
+          text={`“${expense.name}” sai da lista. Os meses já marcados como pagos também saem.`}
+          confirmLabel="Excluir"
+          onClose={() => setConfirming(false)}
+          onConfirm={() => {
+            removeFixed(expense.id)
+            onClose()
+          }}
+        />
+      ) : null}
+    </>
+  )
+}
+
+export function CardDialog({ card, onClose }: { card: CreditCard | null; onClose: () => void }) {
+  const { upsertCard, removeCard, state } = useStore()
+  const [nickname, setNickname] = useState(card?.nickname ?? '')
+  const [lastFour, setLastFour] = useState(card?.lastFour ?? '')
+  const [limit, setLimit] = useState(card && card.limit > 0 ? formatInput(card.limit) : '')
+  const [closingDay, setClosingDay] = useState(String(card?.closingDay ?? 5))
+  const [dueDay, setDueDay] = useState(String(card?.dueDay ?? 12))
+  const [color, setColor] = useState(card?.color ?? 'forest')
+  const [error, setError] = useState('')
+  const [confirming, setConfirming] = useState(false)
+  const purchases = state.purchases.filter((item) => item.cardId === card?.id).length
+
+  const save = () => {
+    const parsedLimit = limit.trim() ? parseMoney(limit) : 0
+    const closing = parseDay(closingDay)
+    const due = parseDay(dueDay)
+    const digits = lastFour.replace(/\D/g, '')
+    if (!nickname.trim()) {
+      setError('Dê um nome ao cartão.')
+      return
+    }
+    if (parsedLimit == null) {
+      setError('O limite precisa ser um valor válido, ou fique em branco.')
+      return
+    }
+    if (closing == null || due == null) {
+      setError('Fechamento e vencimento ficam entre os dias 1 e 31.')
+      return
+    }
+    if (digits && digits.length !== 4) {
+      setError('O final do cartão tem 4 números.')
+      return
+    }
+    upsertCard({
+      id: card?.id ?? uid(),
+      nickname: nickname.trim(),
+      lastFour: digits,
+      limit: parsedLimit,
+      closingDay: closing,
+      dueDay: due,
+      color,
+    })
+    onClose()
+  }
+
+  return (
+    <>
+      <Modal
+        title={card ? 'Editar cartão' : 'Novo cartão'}
+        description="O fechamento define qual compra entra na fatura. O vencimento é o dia em que ela sai da conta."
+        onClose={onClose}
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {card ? (
+              <Button variant="danger" onClick={() => setConfirming(true)}>
+                Excluir
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-3">
+              <Button variant="ghost" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button onClick={save}>Salvar</Button>
+            </div>
+          </div>
+        }
+      >
+        <form
+          className="space-y-4 pb-2"
+          onSubmit={(event) => {
+            event.preventDefault()
+            save()
+          }}
+        >
+          <Field label="Nome do cartão">
+            <input autoFocus className={fieldClass} value={nickname} onChange={(event) => setNickname(event.target.value)} placeholder="Ex.: Nubank" />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Final">
+              <input
+                className={fieldClass}
+                inputMode="numeric"
+                maxLength={4}
+                value={lastFour}
+                onChange={(event) => setLastFour(event.target.value.replace(/\D/g, '').slice(0, 4))}
+                placeholder="1234"
+              />
+            </Field>
+            <MoneyField label="Limite" value={limit} onChange={setLimit} hint="Em branco se você ainda não souber." />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Dia de fechamento">
+              <input className={fieldClass} inputMode="numeric" value={closingDay} onChange={(event) => setClosingDay(event.target.value)} />
+            </Field>
+            <Field label="Dia de vencimento">
+              <input className={fieldClass} inputMode="numeric" value={dueDay} onChange={(event) => setDueDay(event.target.value)} />
+            </Field>
+          </div>
+          <Field label="Cor">
+            <div className="flex flex-wrap gap-2 pt-1">
+              {CARD_COLORS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-label={item.label}
+                  aria-pressed={color === item.id}
+                  onClick={() => setColor(item.id)}
+                  className={`h-9 w-9 rounded-full ${color === item.id ? 'ring-2 ring-ink ring-offset-2' : ''}`}
+                  style={{ background: `linear-gradient(140deg, ${item.from}, ${item.to})` }}
+                />
+              ))}
+            </div>
+          </Field>
+          {error ? <p className="text-sm text-clay">{error}</p> : null}
+        </form>
+      </Modal>
+      {confirming && card ? (
+        <ConfirmDialog
+          title="Excluir cartão"
+          text={
+            purchases > 0
+              ? `“${card.nickname}” e ${purchases} compra(s) lançada(s) nele serão apagados.`
+              : `“${card.nickname}” será apagado.`
+          }
+          confirmLabel="Excluir"
+          onClose={() => setConfirming(false)}
+          onConfirm={() => {
+            removeCard(card.id)
+            onClose()
+          }}
+        />
+      ) : null}
+    </>
+  )
+}
+
+export function PurchaseDialog({
+  cardId,
+  purchase,
+  onClose,
+}: {
+  cardId: string
+  purchase: Purchase | null
+  onClose: () => void
+}) {
+  const { upsertPurchase, removePurchase } = useStore()
+  const [description, setDescription] = useState(purchase?.description ?? '')
+  const [amount, setAmount] = useState(purchase ? formatInput(purchase.amount) : '')
+  const [date, setDate] = useState(purchase?.date ?? todayISO())
+  const [installments, setInstallments] = useState(String(purchase?.installments ?? 1))
+  const [category, setCategory] = useState<SpendingCategory>(purchase?.category ?? 'outro')
+  const [error, setError] = useState('')
+  const [confirming, setConfirming] = useState(false)
+  const parsedAmount = parseMoney(amount)
+  const count = Math.min(24, Math.max(1, Math.round(Number(installments)) || 1))
+  const preview =
+    parsedAmount && parsedAmount > 0
+      ? installmentSchedule({ amount: parsedAmount, installments: count, date }).map((item) => item.amount)
+      : []
+
+  const save = () => {
+    if (!description.trim()) {
+      setError('Descreva a compra.')
+      return
+    }
+    if (parsedAmount == null || parsedAmount <= 0) {
+      setError('Informe o valor total da compra.')
+      return
+    }
+    if (!date) {
+      setError('Informe a data da compra.')
+      return
+    }
+    if (!Number.isInteger(Number(installments)) || count < 1 || count > 24) {
+      setError('As parcelas vão de 1 a 24.')
+      return
+    }
+    upsertPurchase({
+      id: purchase?.id ?? uid(),
+      cardId,
+      description: description.trim(),
+      amount: parsedAmount,
+      installments: count,
+      date,
+      category,
+    })
+    onClose()
+  }
+
+  return (
+    <>
+      <Modal
+        title={purchase ? 'Editar compra' : 'Nova compra'}
+        description="Mercado e lazer entram na meta pelo valor cheio, no dia da compra. A fatura recebe as parcelas."
+        onClose={onClose}
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {purchase ? (
+              <Button variant="danger" onClick={() => setConfirming(true)}>
+                Excluir
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-3">
+              <Button variant="ghost" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button onClick={save}>Salvar</Button>
+            </div>
+          </div>
+        }
+      >
+        <form
+          className="space-y-4 pb-2"
+          onSubmit={(event) => {
+            event.preventDefault()
+            save()
+          }}
+        >
+          <Field label="Descrição">
+            <input autoFocus className={fieldClass} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Ex.: Supermercado" />
+          </Field>
+          <MoneyField label="Valor total" value={amount} onChange={setAmount} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Data da compra">
+              <input type="date" className={fieldClass} value={date} onChange={(event) => setDate(event.target.value)} />
+            </Field>
+            <Field label="Parcelas">
+              <input className={fieldClass} inputMode="numeric" value={installments} onChange={(event) => setInstallments(event.target.value)} />
+            </Field>
+          </div>
+          <Field label="Categoria">
+            <select className={fieldClass} value={category} onChange={(event) => setCategory(event.target.value as SpendingCategory)}>
+              {SPEND_CATEGORIES.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {preview.length > 1 ? (
+            <p className="rounded-xl bg-paper px-3 py-2 text-sm text-ink-soft">
+              {preview.length}x de {formatBRL(preview[0] ?? 0)}
+              {preview[preview.length - 1] !== preview[0] ? ` (última ${formatBRL(preview[preview.length - 1] ?? 0)})` : ''}
+            </p>
+          ) : null}
+          {error ? <p className="text-sm text-clay">{error}</p> : null}
+        </form>
+      </Modal>
+      {confirming && purchase ? (
+        <ConfirmDialog
+          title="Excluir compra"
+          text="A compra sai do cartão e, se for mercado ou lazer, sai da meta também."
+          confirmLabel="Excluir"
+          onClose={() => setConfirming(false)}
+          onConfirm={() => {
+            removePurchase(purchase.id)
+            onClose()
+          }}
+        />
+      ) : null}
+    </>
+  )
+}
+
+export function SpendDialog({
+  category,
+  entry,
+  onClose,
+}: {
+  category: 'mercado' | 'lazer'
+  entry: SpendEntry | null
+  onClose: () => void
+}) {
+  const { state, saveSpend, removeSpend } = useStore()
+  const existingPurchase = entry?.source === 'card' ? state.purchases.find((item) => item.id === entry.id) : undefined
+  const existingCash = entry?.source === 'cash' ? state.cashExpenses.find((item) => item.id === entry.id) : undefined
+  const [description, setDescription] = useState(entry?.description ?? '')
+  const [amount, setAmount] = useState(entry ? formatInput(entry.amount) : '')
+  const [date, setDate] = useState(entry?.date ?? todayISO())
+  const [method, setMethod] = useState<'cartao' | PaymentMethod>(existingPurchase ? 'cartao' : (existingCash?.method ?? 'pix'))
+  const [cardId, setCardId] = useState(existingPurchase?.cardId ?? state.cards[0]?.id ?? '')
+  const [installments, setInstallments] = useState(String(existingPurchase?.installments ?? 1))
+  const [error, setError] = useState('')
+  const [confirming, setConfirming] = useState(false)
+  const title = category === 'mercado' ? 'Compra de mercado' : 'Gasto de lazer'
+
+  const save = () => {
+    const parsedAmount = parseMoney(amount)
+    if (!description.trim()) {
+      setError('Descreva o lançamento.')
+      return
+    }
+    if (parsedAmount == null || parsedAmount <= 0) {
+      setError('Informe o valor.')
+      return
+    }
+    if (!date) {
+      setError('Informe a data.')
+      return
+    }
+    const id = entry?.id ?? uid()
+    if (method === 'cartao') {
+      if (!cardId) {
+        setError('Cadastre um cartão ou escolha Pix, débito ou dinheiro.')
+        return
+      }
+      const count = Math.round(Number(installments))
+      if (!Number.isInteger(count) || count < 1 || count > 24) {
+        setError('As parcelas vão de 1 a 24.')
+        return
+      }
+      saveSpend(entry, {
+        kind: 'card',
+        purchase: { id, cardId, description: description.trim(), amount: parsedAmount, installments: count, date, category },
+      })
+    } else {
+      const expense: CashExpense = {
+        id,
+        description: description.trim(),
+        amount: parsedAmount,
+        date,
+        category,
+        method,
+      }
+      saveSpend(entry, { kind: 'cash', expense })
+    }
+    onClose()
+  }
+
+  return (
+    <>
+      <Modal
+        title={entry ? `Editar ${title.toLowerCase()}` : title}
+        description="O valor inteiro entra na meta no dia em que a compra aconteceu."
+        onClose={onClose}
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {entry ? (
+              <Button variant="danger" onClick={() => setConfirming(true)}>
+                Excluir
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-3">
+              <Button variant="ghost" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button onClick={save}>Salvar</Button>
+            </div>
+          </div>
+        }
+      >
+        <form
+          className="space-y-4 pb-2"
+          onSubmit={(event) => {
+            event.preventDefault()
+            save()
+          }}
+        >
+          <Field label="Descrição">
+            <input
+              autoFocus
+              className={fieldClass}
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder={category === 'mercado' ? 'Ex.: Hortifruti' : 'Ex.: Cinema'}
+            />
+          </Field>
+          <MoneyField label="Valor" value={amount} onChange={setAmount} />
+          <Field label="Data">
+            <input type="date" className={fieldClass} value={date} onChange={(event) => setDate(event.target.value)} />
+          </Field>
+          <Field label="Como foi pago">
+            <select
+              className={fieldClass}
+              value={method}
+              onChange={(event) => setMethod(event.target.value as 'cartao' | PaymentMethod)}
+            >
+              <option value="cartao">Cartão de crédito</option>
+              {PAYMENT_METHODS.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {method === 'cartao' ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Cartão">
+                <select className={fieldClass} value={cardId} onChange={(event) => setCardId(event.target.value)}>
+                  {state.cards.length === 0 ? <option value="">Nenhum cartão</option> : null}
+                  {state.cards.map((card) => (
+                    <option key={card.id} value={card.id}>
+                      {card.nickname}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Parcelas">
+                <input className={fieldClass} inputMode="numeric" value={installments} onChange={(event) => setInstallments(event.target.value)} />
+              </Field>
+            </div>
+          ) : null}
+          {error ? <p className="text-sm text-clay">{error}</p> : null}
+        </form>
+      </Modal>
+      {confirming && entry ? (
+        <ConfirmDialog
+          title="Excluir lançamento"
+          text={entry.source === 'card' ? 'A compra também sai da fatura do cartão.' : 'Esse lançamento será apagado.'}
+          confirmLabel="Excluir"
+          onClose={() => setConfirming(false)}
+          onConfirm={() => {
+            removeSpend(entry)
+            onClose()
+          }}
+        />
+      ) : null}
+    </>
+  )
+}
+
+export function IncomeDialog({ onClose }: { onClose: () => void }) {
+  const { state, upsertIncome, removeIncome } = useStore()
+  const [editing, setEditing] = useState<IncomeSource | null>(null)
+  const [creating, setCreating] = useState(state.incomes.length === 0)
+  const [person, setPerson] = useState<Person>('sara')
+  const [name, setName] = useState('')
+  const [amount, setAmount] = useState('')
+  const [date, setDate] = useState(todayISO())
+  const [repeat, setRepeat] = useState<IncomeRepeat>('monthly')
+  const [error, setError] = useState('')
+  const [removing, setRemoving] = useState<IncomeSource | null>(null)
+  const open = creating || editing != null
+  const migrated = state.incomes.some((item) => item.id === 'renda-inicial' && item.person === 'sara' && item.name === 'Renda da casa')
+
+  const startCreate = () => {
+    setEditing(null)
+    setCreating(true)
+    setPerson('sara')
+    setName('')
+    setAmount('')
+    setDate(todayISO())
+    setRepeat('monthly')
+    setError('')
+  }
+
+  const startEdit = (source: IncomeSource) => {
+    setCreating(false)
+    setEditing(source)
+    setPerson(source.person)
+    setName(source.name)
+    setAmount(formatInput(source.amount))
+    setDate(source.date ?? todayISO())
+    setRepeat(source.repeat)
+    setError('')
+  }
+
+  const save = () => {
+    const parsed = parseMoney(amount)
+    if (!name.trim()) {
+      setError('Diga o que é essa renda. Salário, benefício, extra.')
+      return
+    }
+    if (parsed == null || parsed <= 0) {
+      setError('Informe o valor.')
+      return
+    }
+    if (!date) {
+      setError('Escolha a data.')
+      return
+    }
+    upsertIncome({
+      id: editing?.id ?? uid(),
+      person,
+      name: name.trim(),
+      amount: parsed,
+      date,
+      repeat,
+    })
+    setCreating(false)
+    setEditing(null)
+    setName('')
+    setAmount('')
+    setDate(todayISO())
+    setRepeat('monthly')
+    setError('')
+  }
+
+  return (
+    <>
+    <Modal
+      title="Renda da casa"
+      description="Cada valor diz de quem vem e quando cai: todo mês a partir de uma data, ou só naquele dia."
+      onClose={onClose}
+      footer={
+        <div className="flex flex-wrap justify-end gap-3">
+          {open ? (
+            <>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setCreating(false)
+                  setEditing(null)
+                  setError('')
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={save}>Salvar</Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" onClick={onClose}>
+                Fechar
+              </Button>
+              <Button onClick={startCreate}>Nova origem</Button>
+            </>
+          )}
+        </div>
+      }
+    >
+      <div className="space-y-4 pb-2">
+        {migrated ? (
+          <p className="rounded-xl bg-paper px-3 py-2 text-sm leading-relaxed text-ink-soft">
+            A renda que você já tinha lançado ficou na Sara. Troque a origem para o Vinicius, ou divida em duas.
+          </p>
+        ) : null}
+        {state.incomes.length > 0 ? (
+          <ul className="divide-y divide-line rounded-xl border border-line">
+            {state.incomes.map((source) => (
+              <li key={source.id} className="flex items-center gap-3 px-3 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">{source.name}</p>
+                  <p className="text-xs text-ink-soft">{incomeWhen(source)}</p>
+                </div>
+                <span className="text-sm tabular-nums">{formatBRL(source.amount)}</span>
+                <button type="button" className="text-sm font-medium text-moss" onClick={() => startEdit(source)}>
+                  Editar
+                </button>
+                <button type="button" className="text-sm text-clay" onClick={() => setRemoving(source)}>
+                  Excluir
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {open ? (
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault()
+              save()
+            }}
+          >
+            <div>
+              <span className="mb-1.5 block text-sm font-medium text-ink">De quem é</span>
+              <div className="grid grid-cols-2 gap-2">
+                {PEOPLE.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    aria-pressed={person === item.id}
+                    onClick={() => setPerson(item.id)}
+                    className={`h-10 rounded-xl border text-sm font-medium ${person === item.id ? 'border-moss bg-[#e5f2eb] text-moss' : 'border-line bg-white text-ink'}`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Field label="O que é">
+              <input autoFocus className={fieldClass} value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Salário" />
+            </Field>
+            <div>
+              <span className="mb-1.5 block text-sm font-medium text-ink">Quando entra</span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  aria-pressed={repeat === 'monthly'}
+                  onClick={() => setRepeat('monthly')}
+                  className={`h-10 rounded-xl border text-sm font-medium ${repeat === 'monthly' ? 'border-moss bg-[#e5f2eb] text-moss' : 'border-line bg-white text-ink'}`}
+                >
+                  Todo mês
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={repeat === 'once'}
+                  onClick={() => setRepeat('once')}
+                  className={`h-10 rounded-xl border text-sm font-medium ${repeat === 'once' ? 'border-moss bg-[#e5f2eb] text-moss' : 'border-line bg-white text-ink'}`}
+                >
+                  Só nesta data
+                </button>
+              </div>
+            </div>
+            <Field label={repeat === 'monthly' ? 'A partir de' : 'Data'} hint={repeat === 'monthly' ? 'Entra neste mês e nos seguintes, no dia escolhido.' : 'Entra só no mês dessa data.'}>
+              <input type="date" className={fieldClass} value={date} onChange={(event) => setDate(event.target.value)} />
+            </Field>
+            <MoneyField label={repeat === 'monthly' ? 'Valor mensal' : 'Valor'} value={amount} onChange={setAmount} />
+            {error ? <p className="text-sm text-clay">{error}</p> : null}
+          </form>
+        ) : null}
+      </div>
+    </Modal>
+    {removing ? (
+      <ConfirmDialog
+        title="Excluir renda"
+        text={`“${removing.name}” sai da renda da ${removing.person === 'sara' ? 'Sara' : 'Vinicius'}.`}
+        confirmLabel="Excluir"
+        onClose={() => setRemoving(null)}
+        onConfirm={() => {
+          removeIncome(removing.id)
+          setRemoving(null)
+        }}
+      />
+    ) : null}
+    </>
+  )
+}
+
+function incomeWhen(source: IncomeSource): string {
+  const who = source.person === 'sara' ? 'Sara' : 'Vinicius'
+  if (!source.date) return `${who} · todo mês`
+  const when = parseDate(source.date)
+  if (source.repeat === 'once') return `${who} · só em ${formatShort(when)}`
+  return `${who} · todo dia ${when.getDate()}, desde ${formatShort(when)}`
+}
+
+export function CompanyDialog({ entry, onClose }: { entry: CompanyEntry | null; onClose: () => void }) {
+  const { upsertCompany, removeCompany } = useStore()
+  const [direction, setDirection] = useState<CompanyDirection>(entry?.direction ?? 'saida')
+  const [description, setDescription] = useState(entry?.description ?? '')
+  const [amount, setAmount] = useState(entry ? formatInput(entry.amount) : '')
+  const [date, setDate] = useState(entry?.date ?? todayISO())
+  const [category, setCategory] = useState(entry?.category ?? 'Outro')
+  const [error, setError] = useState('')
+  const [confirming, setConfirming] = useState(false)
+
+  const save = () => {
+    const parsed = parseMoney(amount)
+    if (!description.trim()) {
+      setError('Descreva o movimento.')
+      return
+    }
+    if (parsed == null || parsed <= 0) {
+      setError('Informe o valor.')
+      return
+    }
+    if (!date) {
+      setError('Informe a data.')
+      return
+    }
+    upsertCompany({
+      id: entry?.id ?? uid(),
+      direction,
+      description: description.trim(),
+      amount: parsed,
+      date,
+      category,
+    })
+    onClose()
+  }
+
+  return (
+    <>
+      <Modal
+        title={entry ? 'Editar movimento' : 'Movimento da empresa'}
+        description="Entrada soma na renda da casa. Saída soma no que sai da casa."
+        onClose={onClose}
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {entry ? (
+              <Button variant="danger" onClick={() => setConfirming(true)}>
+                Excluir
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-3">
+              <Button variant="ghost" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button onClick={save}>Salvar</Button>
+            </div>
+          </div>
+        }
+      >
+        <form
+          className="space-y-4 pb-2"
+          onSubmit={(event) => {
+            event.preventDefault()
+            save()
+          }}
+        >
+          <div>
+            <span className="mb-1.5 block text-sm font-medium text-ink">Tipo</span>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                aria-pressed={direction === 'entrada'}
+                onClick={() => setDirection('entrada')}
+                className={`h-10 rounded-xl border text-sm font-medium ${direction === 'entrada' ? 'border-moss bg-[#e5f2eb] text-moss' : 'border-line bg-white'}`}
+              >
+                Entrada
+              </button>
+              <button
+                type="button"
+                aria-pressed={direction === 'saida'}
+                onClick={() => setDirection('saida')}
+                className={`h-10 rounded-xl border text-sm font-medium ${direction === 'saida' ? 'border-clay bg-[#f8e6e3] text-clay' : 'border-line bg-white'}`}
+              >
+                Saída
+              </button>
+            </div>
+          </div>
+          <Field label="Descrição">
+            <input autoFocus className={fieldClass} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Ex.: Cliente ou fornecedor" />
+          </Field>
+          <MoneyField label="Valor" value={amount} onChange={setAmount} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Data">
+              <input type="date" className={fieldClass} value={date} onChange={(event) => setDate(event.target.value)} />
+            </Field>
+            <Field label="Categoria">
+              <select className={fieldClass} value={category} onChange={(event) => setCategory(event.target.value)}>
+                {COMPANY_CATEGORIES.map((item) => (
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          {error ? <p className="text-sm text-clay">{error}</p> : null}
+        </form>
+      </Modal>
+      {confirming && entry ? (
+        <ConfirmDialog
+          title="Excluir movimento"
+          text="Esse valor sai da empresa e também da conta da casa."
+          confirmLabel="Excluir"
+          onClose={() => setConfirming(false)}
+          onConfirm={() => {
+            removeCompany(entry.id)
+            onClose()
+          }}
+        />
+      ) : null}
+    </>
+  )
+}
