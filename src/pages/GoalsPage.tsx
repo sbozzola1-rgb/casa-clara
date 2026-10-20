@@ -82,7 +82,7 @@ export function GoalsPage() {
 
       <Panel title="Cópia dos dados" className="mt-4">
         <p className="max-w-2xl text-sm leading-relaxed text-ink-soft">
-          Tudo fica neste navegador, neste computador. Baixe uma cópia de vez em quando. Se limpar o navegador, a restauração devolve a casa do jeito que estava.
+          O que você lançar aparece para o Vinicius, e o que ele lançar aparece para você. A cópia em arquivo é só uma reserva.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button onClick={download}>Baixar cópia</Button>

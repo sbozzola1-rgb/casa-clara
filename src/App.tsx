@@ -8,6 +8,8 @@ import { FixedPage } from './pages/FixedPage.tsx'
 import { GoalsPage } from './pages/GoalsPage.tsx'
 import { OverduePage } from './pages/OverduePage.tsx'
 import { GroceryPage, LeisurePage } from './pages/SpendingPages.tsx'
+import { HouseGate } from './auth.tsx'
+import { signOut } from './lib/cloud.ts'
 import { StoreProvider, useStore, type Page } from './state.tsx'
 
 const NAV: { id: Page['id']; label: string; icon: 'home' | 'late' | 'fixed' | 'card' | 'market' | 'leisure' | 'company' | 'goal' }[] = [
@@ -23,9 +25,11 @@ const NAV: { id: Page['id']; label: string; icon: 'home' | 'late' | 'fixed' | 'c
 
 export default function App() {
   return (
-    <StoreProvider>
-      <Shell />
-    </StoreProvider>
+    <HouseGate>
+      <StoreProvider>
+        <Shell />
+      </StoreProvider>
+    </HouseGate>
   )
 }
 
@@ -86,7 +90,7 @@ function Shell() {
           })}
         </nav>
         <div className="px-6 py-5 text-xs leading-relaxed text-white/50">
-          <p>Os dados ficam neste navegador.</p>
+          <p>A casa fica online. O que um lançar, o outro vê.</p>
           <div className="mt-3 flex gap-3">
             <button type="button" onClick={download} className="text-white/80 hover:text-white">
               Baixar cópia
@@ -116,6 +120,9 @@ function Shell() {
                 </button>
               ) : null}
             </div>
+            <button type="button" onClick={() => void signOut()} className="text-sm font-medium text-ink-soft hover:text-ink">
+              Sair
+            </button>
           </div>
         </header>
         <main className="px-4 py-6 pb-28 md:px-8 md:pb-10">

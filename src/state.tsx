@@ -1,7 +1,8 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { pullHousehold, pushHousehold, subscribeHousehold } from './lib/cloud.ts'
 import { monthKey } from './lib/dates.ts'
 import { loadState, sanitize, saveState } from './lib/storage.ts'
-import type { AppState, CashExpense, CompanyEntry, CreditCard, FixedExpense, IncomeSource, Purchase, SpendEntry } from './lib/types.ts'
+import { emptyState, type AppState, type CashExpense, type CompanyEntry, type CreditCard, type FixedExpense, type IncomeSource, type Purchase, type SpendEntry } from './lib/types.ts'
 
 export type Page =
   | { id: 'dashboard' }
@@ -46,15 +47,92 @@ interface Store {
 const StoreContext = createContext<Store | null>(null)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AppState>(() => loadState())
+  const [state, setState] = useState<AppState>(() => emptyState())
+  const [ready, setReady] = useState(false)
   const [month, setMonth] = useState(() => monthKey(new Date()))
   const [page, setPage] = useState<Page>({ id: 'dashboard' })
   const [toast, setToast] = useState<string | null>(null)
   const [today] = useState(() => new Date())
+  const revision = useRef(0)
+  const ignorePush = useRef(true)
 
   useEffect(() => {
+    let cancel = false
+    void (async () => {
+      const local = loadState()
+      try {
+        const remote = await pullHousehold()
+        if (cancel) return
+        const clean = remote ? sanitize(remote.data) : null
+        if (remote && clean) {
+          revision.current = remote.revision
+          ignorePush.current = true
+          setState(clean)
+        } else {
+          ignorePush.current = false
+          revision.current = 0
+          setState(local)
+        }
+      } catch {
+        if (cancel) return
+        ignorePush.current = true
+        setState(local)
+        setToast('Sem conexão. Mostrando a última cópia deste aparelho.')
+      } finally {
+        if (!cancel) setReady(true)
+      }
+    })()
+    return () => {
+      cancel = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!ready) return
+    return subscribeHousehold((row) => {
+      if (row.revision <= revision.current) return
+      const clean = sanitize(row.data)
+      if (!clean) return
+      revision.current = row.revision
+      ignorePush.current = true
+      setState(clean)
+    })
+  }, [ready])
+
+  const sending = useRef(false)
+  const pending = useRef<AppState | null>(null)
+
+  useEffect(() => {
+    if (!ready) return
     saveState(state)
-  }, [state])
+    if (ignorePush.current) {
+      ignorePush.current = false
+      return
+    }
+    pending.current = state
+    const timer = window.setTimeout(() => {
+      const flush = () => {
+        const snapshot = pending.current
+        if (!snapshot || sending.current) return
+        pending.current = null
+        sending.current = true
+        const nextRevision = revision.current + 1
+        void pushHousehold(snapshot, nextRevision)
+          .then(() => {
+            revision.current = Math.max(revision.current, nextRevision)
+          })
+          .catch(() => {
+            setToast('Não consegui salvar online. Tente de novo.')
+          })
+          .finally(() => {
+            sending.current = false
+            flush()
+          })
+      }
+      flush()
+    }, 400)
+    return () => window.clearTimeout(timer)
+  }, [state, ready])
 
   useEffect(() => {
     if (!toast) return
@@ -221,7 +299,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [state, month, today, page, toast])
 
-  return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
+  return (
+    <StoreContext.Provider value={value}>
+      {ready ? children : <p className="grid min-h-screen place-items-center bg-paper px-6 text-sm text-ink-soft">Abrindo a casa…</p>}
+    </StoreContext.Provider>
+  )
 }
 
 export function useStore(): Store {
