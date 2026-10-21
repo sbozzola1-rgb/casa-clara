@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { pullHousehold, pushHousehold, subscribeHousehold } from './lib/cloud.ts'
+import { uid } from './lib/money.ts'
 import { monthKey } from './lib/dates.ts'
 import { loadState, sanitize, saveState } from './lib/storage.ts'
-import { emptyState, type AppState, type CashExpense, type CompanyEntry, type CreditCard, type FixedExpense, type GroceryInflow, type IncomeSource, type Purchase, type SpendEntry } from './lib/types.ts'
+import { emptyState, SPEND_CATEGORIES, type AppState, type CashExpense, type CompanyEntry, type CreditCard, type FixedExpense, type GroceryInflow, type IncomeSource, type Purchase, type SpendEntry } from './lib/types.ts'
 
 export type Page =
   | { id: 'dashboard' }
@@ -46,6 +47,8 @@ interface Store {
   setFuelMonth: (month: string, value: number | null) => void
   upsertGroceryInflow: (entry: GroceryInflow) => void
   removeGroceryInflow: (id: string) => void
+  addCustomCategory: (name: string) => string
+  removeCustomCategory: (id: string) => void
   replaceState: (input: unknown) => void
 }
 
@@ -317,6 +320,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       removeGroceryInflow: (id) => {
         setState((current) => ({ ...current, groceryInflows: current.groceryInflows.filter((item) => item.id !== id) }))
         notify('Entrada do mercado removida')
+      },
+      addCustomCategory: (name) => {
+        const trimmed = name.trim()
+        if (!trimmed) return ''
+        const builtin = SPEND_CATEGORIES.find((item) => item.label.toLowerCase() === trimmed.toLowerCase())
+        if (builtin) return builtin.id
+        const existing = (state.customCategories ?? []).find((item) => item.name.toLowerCase() === trimmed.toLowerCase())
+        if (existing) return existing.id
+        const id = uid()
+        setState((current) => ({
+          ...current,
+          customCategories: [...(current.customCategories ?? []), { id, name: trimmed }],
+        }))
+        notify('Categoria salva')
+        return id
+      },
+      removeCustomCategory: (id) => {
+        setState((current) => ({
+          ...current,
+          customCategories: (current.customCategories ?? []).filter((item) => item.id !== id),
+          purchases: current.purchases.map((item) => (item.category === id ? { ...item, category: 'outro' } : item)),
+        }))
+        notify('Categoria removida')
       },
       replaceState: (next: unknown) => {
         const clean = sanitize(next)

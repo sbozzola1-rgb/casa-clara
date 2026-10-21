@@ -253,7 +253,7 @@ export function variableSpending(state: AppState, month: string): CategorySlice[
     totals.set(expense.category, round2((totals.get(expense.category) ?? 0) + expense.amount))
   }
   return [...totals.entries()]
-    .map(([id, amount]) => ({ id, label: categoryLabel(id), amount }))
+    .map(([id, amount]) => ({ id, label: categoryLabel(id, state.customCategories ?? []), amount }))
     .sort((a, b) => b.amount - a.amount)
 }
 

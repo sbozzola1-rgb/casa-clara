@@ -1,4 +1,4 @@
-import { emptyState, CARD_COLORS, COMPANY_CATEGORIES, COMPANY_PAYMENTS, FIXED_ICONS, iconForCategory, PAYMENT_METHODS, PEOPLE, SPEND_CATEGORIES, type AppState, type CardColorId, type CompanyDirection, type CompanyPayment, type FixedIconId, type GroceryInflow, type IncomeSource, type PaymentMethod, type Person, type SpendingCategory } from './types.ts'
+import { emptyState, CARD_COLORS, COMPANY_CATEGORIES, COMPANY_PAYMENTS, FIXED_ICONS, iconForCategory, PAYMENT_METHODS, PEOPLE, SPEND_CATEGORIES, type AppState, type CardColorId, type CompanyDirection, type CompanyPayment, type CustomCategory, type FixedIconId, type GroceryInflow, type IncomeSource, type PaymentMethod, type Person } from './types.ts'
 
 const KEY = 'casa-clara.v1'
 const spendIds = new Set<string>(SPEND_CATEGORIES.map((item) => item.id))
@@ -54,6 +54,20 @@ function readIncomes(source: { incomes?: unknown; monthlyIncome?: unknown }): In
   return []
 }
 
+function readCustomCategories(value: unknown): CustomCategory[] {
+  if (!Array.isArray(value)) return []
+  const seen = new Set<string>()
+  const items: CustomCategory[] = []
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || typeof item.id !== 'string') continue
+    const name = text(item.name).trim()
+    if (!name || seen.has(item.id)) continue
+    seen.add(item.id)
+    items.push({ id: item.id, name })
+  }
+  return items
+}
+
 function readMonthAmounts(value: unknown): Record<string, number> {
   const amounts: Record<string, number> = {}
   if (!value || typeof value !== 'object') return amounts
@@ -72,6 +86,8 @@ export function sanitize(input: unknown): AppState | null {
   const goals = source.goals && typeof source.goals === 'object' ? source.goals : base.goals
   const groceryByMonth = readMonthAmounts(goals.groceryByMonth)
   const fuelByMonth = readMonthAmounts(goals.fuelByMonth)
+  const customCategories = readCustomCategories(source.customCategories)
+  const customIds = new Set(customCategories.map((item) => item.id))
 
   return {
     version: 1,
@@ -143,7 +159,7 @@ export function sanitize(input: unknown): AppState | null {
             amount: numberOrNull(item.amount) ?? 0,
             installments: Math.min(24, Math.max(1, Math.round(Number(item.installments)) || 1)),
             date: /^\d{4}-\d{2}-\d{2}$/.test(text(item.date)) ? text(item.date) : '2026-01-01',
-            category: (spendIds.has(text(item.category)) ? item.category : 'outro') as SpendingCategory,
+            category: spendIds.has(text(item.category)) || customIds.has(text(item.category)) ? text(item.category) : 'outro',
           }))
       : [],
     cashExpenses: Array.isArray(source.cashExpenses)
@@ -191,6 +207,7 @@ export function sanitize(input: unknown): AppState | null {
       fuelMonthlyDefault: numberOrNull(goals.fuelMonthlyDefault),
       fuelByMonth,
     },
+    customCategories,
   }
 }
 

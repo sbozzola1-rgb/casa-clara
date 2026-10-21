@@ -27,7 +27,6 @@ import {
   type Person,
   type Purchase,
   type SpendEntry,
-  type SpendingCategory,
 } from '../lib/types.ts'
 import { useStore } from '../state.tsx'
 import { ConfirmDialog, Modal } from './Modal.tsx'
@@ -387,12 +386,14 @@ export function PurchaseDialog({
   purchase: Purchase | null
   onClose: () => void
 }) {
-  const { upsertPurchase, removePurchase } = useStore()
+  const { state, upsertPurchase, removePurchase, addCustomCategory, removeCustomCategory } = useStore()
   const [description, setDescription] = useState(purchase?.description ?? '')
   const [amount, setAmount] = useState(purchase ? formatInput(purchase.amount) : '')
   const [date, setDate] = useState(purchase?.date ?? todayISO())
   const [installments, setInstallments] = useState(String(purchase?.installments ?? 1))
-  const [category, setCategory] = useState<SpendingCategory>(purchase?.category ?? 'outro')
+  const [category, setCategory] = useState(purchase?.category ?? 'outro')
+  const [addingCategory, setAddingCategory] = useState(false)
+  const [newCategory, setNewCategory] = useState('')
   const [error, setError] = useState('')
   const [confirming, setConfirming] = useState(false)
   const parsedAmount = parseMoney(amount)
@@ -475,14 +476,64 @@ export function PurchaseDialog({
             </Field>
           </div>
           <Field label="Categoria">
-            <select className={fieldClass} value={category} onChange={(event) => setCategory(event.target.value as SpendingCategory)}>
+            <select className={fieldClass} value={category} onChange={(event) => setCategory(event.target.value)}>
               {SPEND_CATEGORIES.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.label}
                 </option>
               ))}
+              {state.customCategories.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
             </select>
           </Field>
+          {addingCategory ? (
+            <div className="flex gap-2">
+              <input
+                className={fieldClass}
+                value={newCategory}
+                placeholder="Ex.: Pet"
+                onChange={(event) => setNewCategory(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return
+                  event.preventDefault()
+                  if (!newCategory.trim()) return
+                  setCategory(addCustomCategory(newCategory))
+                  setNewCategory('')
+                  setAddingCategory(false)
+                }}
+              />
+              <Button
+                type="button"
+                onClick={() => {
+                  if (!newCategory.trim()) return
+                  setCategory(addCustomCategory(newCategory))
+                  setNewCategory('')
+                  setAddingCategory(false)
+                }}
+              >
+                Salvar categoria
+              </Button>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setAddingCategory(true)} className="text-sm font-medium text-moss">
+              Cadastrar categoria
+            </button>
+          )}
+          {state.customCategories.some((item) => item.id === category) ? (
+            <button
+              type="button"
+              className="text-sm font-medium text-clay"
+              onClick={() => {
+                removeCustomCategory(category)
+                setCategory('outro')
+              }}
+            >
+              Excluir esta categoria
+            </button>
+          ) : null}
           {preview.length > 1 ? (
             <p className="rounded-xl bg-paper px-3 py-2 text-sm text-ink-soft">
               {preview.length}x de {formatBRL(preview[0] ?? 0)}

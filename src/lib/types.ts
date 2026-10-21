@@ -27,6 +27,11 @@ export const SPEND_CATEGORIES = [
 
 export type SpendingCategory = (typeof SPEND_CATEGORIES)[number]['id']
 
+export interface CustomCategory {
+  id: string
+  name: string
+}
+
 export type BudgetCategory = 'mercado' | 'lazer' | 'combustivel'
 
 export type PaymentMethod = 'pix' | 'debito' | 'dinheiro'
@@ -112,7 +117,7 @@ export interface Purchase {
   amount: number
   installments: number
   date: string
-  category: SpendingCategory
+  category: string
 }
 
 export interface CashExpense {
@@ -195,6 +200,7 @@ export interface AppState {
   paidInvoices: Record<string, true>
   goals: Goals
   groceryInflows: GroceryInflow[]
+  customCategories: CustomCategory[]
 }
 
 export interface SpendEntry {
@@ -227,11 +233,12 @@ export function emptyState(): AppState {
       fuelByMonth: {},
     },
     groceryInflows: [],
+    customCategories: [],
   }
 }
 
-export function categoryLabel(id: string): string {
-  return SPEND_CATEGORIES.find((item) => item.id === id)?.label ?? id
+export function categoryLabel(id: string, custom: CustomCategory[] = []): string {
+  return SPEND_CATEGORIES.find((item) => item.id === id)?.label ?? custom.find((item) => item.id === id)?.name ?? id
 }
 
 export function cardPalette(id: string) {

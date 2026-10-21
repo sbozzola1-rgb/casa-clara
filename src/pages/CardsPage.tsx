@@ -186,7 +186,7 @@ export function CardDetail({ cardId }: { cardId: string }) {
                       <span>
                         <span className="block text-sm font-medium">{line.description}</span>
                         <span className="block text-xs text-ink-soft">
-                          {formatFriendly(line.date, today)} · {categoryLabel(line.category)}
+                          {formatFriendly(line.date, today)} · {categoryLabel(line.category, state.customCategories)}
                           {line.installments > 1 ? ` · parcela ${line.installment} de ${line.installments}` : ''}
                         </span>
                       </span>
@@ -209,7 +209,7 @@ export function CardDetail({ cardId }: { cardId: string }) {
                       <span>
                         <span className="block text-sm font-medium">{item.description}</span>
                         <span className="block text-xs text-ink-soft">
-                          {formatFriendly(item.date, today)} · {categoryLabel(item.category)}
+                          {formatFriendly(item.date, today)} · {categoryLabel(item.category, state.customCategories)}
                           {item.installments > 1 ? ` · ${item.installments}x` : ' · à vista'}
                         </span>
                       </span>
