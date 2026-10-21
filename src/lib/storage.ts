@@ -53,19 +53,24 @@ function readIncomes(source: { incomes?: unknown; monthlyIncome?: unknown }): In
   return []
 }
 
+function readMonthAmounts(value: unknown): Record<string, number> {
+  const amounts: Record<string, number> = {}
+  if (!value || typeof value !== 'object') return amounts
+  for (const [key, amountValue] of Object.entries(value)) {
+    if (!/^\d{4}-\d{2}$/.test(key)) continue
+    const amount = numberOrNull(amountValue)
+    if (amount != null) amounts[key] = amount
+  }
+  return amounts
+}
+
 export function sanitize(input: unknown): AppState | null {
   if (!input || typeof input !== 'object') return null
   const source = input as Partial<AppState> & { monthlyIncome?: unknown }
   const base = emptyState()
   const goals = source.goals && typeof source.goals === 'object' ? source.goals : base.goals
-  const groceryByMonth: Record<string, number> = {}
-  if (goals.groceryByMonth && typeof goals.groceryByMonth === 'object') {
-    for (const [key, value] of Object.entries(goals.groceryByMonth)) {
-      if (!/^\d{4}-\d{2}$/.test(key)) continue
-      const amount = numberOrNull(value)
-      if (amount != null) groceryByMonth[key] = amount
-    }
-  }
+  const groceryByMonth = readMonthAmounts(goals.groceryByMonth)
+  const fuelByMonth = readMonthAmounts(goals.fuelByMonth)
 
   return {
     version: 1,
@@ -139,7 +144,7 @@ export function sanitize(input: unknown): AppState | null {
           .filter((item) => item && typeof item === 'object' && typeof item.id === 'string')
           .flatMap((item) => {
             const category = text(item.category)
-            if (category !== 'mercado' && category !== 'lazer') return []
+            if (category !== 'mercado' && category !== 'lazer' && category !== 'combustivel') return []
             return [
               {
                 id: item.id,
@@ -176,6 +181,8 @@ export function sanitize(input: unknown): AppState | null {
       leisureWeeklyMax: numberOrNull(goals.leisureWeeklyMax),
       groceryMonthlyDefault: numberOrNull(goals.groceryMonthlyDefault),
       groceryByMonth,
+      fuelMonthlyDefault: numberOrNull(goals.fuelMonthlyDefault),
+      fuelByMonth,
     },
   }
 }

@@ -1,6 +1,6 @@
 import { addMonthsClamped, dateOn, formatISO, inRange, monthKey, monthName, monthRange, parseDate, parseMonthKey, startOfDay } from './dates.ts'
 import { round2 } from './money.ts'
-import { categoryLabel, methodLabel, type AppState, type CreditCard, type Purchase, type SpendEntry } from './types.ts'
+import { categoryLabel, methodLabel, type AppState, type BudgetCategory, type CreditCard, type Purchase, type SpendEntry } from './types.ts'
 
 export interface Installment {
   index: number
@@ -160,7 +160,15 @@ export function groceryGoal(state: AppState, month: string): { amount: number | 
   return { amount, override, base, inflowTotal }
 }
 
-export function spendEntries(state: AppState, category: 'mercado' | 'lazer'): SpendEntry[] {
+export function fuelGoal(state: AppState, month: string): { amount: number | null; override: boolean } {
+  const byMonth = state.goals.fuelByMonth ?? {}
+  if (Object.prototype.hasOwnProperty.call(byMonth, month)) {
+    return { amount: byMonth[month] ?? null, override: true }
+  }
+  return { amount: state.goals.fuelMonthlyDefault ?? null, override: false }
+}
+
+export function spendEntries(state: AppState, category: BudgetCategory): SpendEntry[] {
   const fromCards: SpendEntry[] = state.purchases
     .filter((purchase) => purchase.category === category)
     .map((purchase) => {
@@ -191,7 +199,7 @@ export function spendEntries(state: AppState, category: 'mercado' | 'lazer'): Sp
   return [...fromCards, ...fromCash].sort((a, b) => b.date.localeCompare(a.date) || a.description.localeCompare(b.description))
 }
 
-export function spentInRange(state: AppState, category: 'mercado' | 'lazer', start: Date, end: Date) {
+export function spentInRange(state: AppState, category: BudgetCategory, start: Date, end: Date) {
   const entries = spendEntries(state, category).filter((entry) => inRange(parseDate(entry.date), start, end))
   return {
     entries,
@@ -391,6 +399,18 @@ export function grocerySeries(state: AppState, endMonth: string, count = 6) {
     const goal = groceryGoal(state, key).amount
     const name = monthName(key)
     return { month: key, label: name.slice(0, 3), spent, goal }
+  })
+}
+
+export function fuelSeries(state: AppState, endMonth: string, count = 6) {
+  const { year, monthIndex } = parseMonthKey(endMonth)
+  return Array.from({ length: count }, (_, index) => {
+    const shift = index - (count - 1)
+    const key = monthKey(new Date(year, monthIndex + shift, 1))
+    const range = monthRange(key)
+    const spent = spentInRange(state, 'combustivel', range.start, range.end).total
+    const goal = fuelGoal(state, key).amount
+    return { month: key, label: monthName(key).slice(0, 3), spent, goal }
   })
 }
 

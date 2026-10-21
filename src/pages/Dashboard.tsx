@@ -3,7 +3,7 @@ import { IncomeDialog } from '../components/dialogs.tsx'
 import { ExpenseMark } from '../components/ExpenseIcon.tsx'
 import { BudgetMeter, Button, FlowChart, Panel, ToneBadge, toneLabel } from '../components/ui.tsx'
 import { dateOn, dueTone, formatShort, monthRange, monthTitle, parseMonthKey, startOfWeek, weekTitle } from '../lib/dates.ts'
-import { fixedKey, flowSeries, groceryGoal, invoiceForCard, invoicesDueInMonth, limitUsed, monthFlow, openInvoiceMonth, overdueItems, spentInRange, variableSpending } from '../lib/finance.ts'
+import { fixedKey, flowSeries, fuelGoal, groceryGoal, invoiceForCard, invoicesDueInMonth, limitUsed, monthFlow, openInvoiceMonth, overdueItems, spentInRange, variableSpending } from '../lib/finance.ts'
 import { formatBRL, round2 } from '../lib/money.ts'
 import { useStore } from '../state.tsx'
 
@@ -19,6 +19,8 @@ export function Dashboard() {
   const groceryRange = monthRange(month)
   const grocery = spentInRange(state, 'mercado', groceryRange.start, groceryRange.end)
   const goal = groceryGoal(state, month)
+  const fuelSpent = spentInRange(state, 'combustivel', groceryRange.start, groceryRange.end)
+  const fuel = fuelGoal(state, month)
   const slices = variableSpending(state, month)
   const peak = Math.max(1, ...slices.map((item) => item.amount))
   const leftover = flow.hasIncome ? flow.leftover : null
@@ -27,6 +29,7 @@ export function Dashboard() {
   const series = flowSeries(state, month)
   const leisureOver = state.goals.leisureWeeklyMax != null && leisure.total > state.goals.leisureWeeklyMax
   const groceryOver = goal.amount != null && grocery.total > goal.amount
+  const fuelOver = fuel.amount != null && fuelSpent.total > fuel.amount
 
   const dues = [
     ...state.fixedExpenses
@@ -66,6 +69,7 @@ export function Dashboard() {
     { done: state.cards.length > 0, label: 'Cartões', hint: 'Um cartão e as compras dele', action: () => setPage({ id: 'cards' }) },
     { done: state.goals.leisureWeeklyMax != null, label: 'Teto de lazer', hint: 'O máximo da semana', action: () => setPage({ id: 'goals' }) },
     { done: state.goals.groceryMonthlyDefault != null, label: 'Meta de mercado', hint: 'O alvo do mês, com ajuste quando precisar', action: () => setPage({ id: 'goals' }) },
+    { done: state.goals.fuelMonthlyDefault != null, label: 'Meta de combustível', hint: 'O teto do mês para abastecer', action: () => setPage({ id: 'goals' }) },
   ]
   const pending = steps.filter((step) => !step.done)
 
@@ -130,10 +134,11 @@ export function Dashboard() {
         </button>
       ) : null}
 
-      {leisureOver || groceryOver ? (
+      {leisureOver || groceryOver || fuelOver ? (
         <div className="mt-4 rounded-2xl border border-[#e7c4b8] bg-[#f8e6e3] px-5 py-4 text-sm leading-relaxed text-clay">
           {leisureOver ? <p>O lazer desta semana passou do teto em {formatBRL(leisure.total - (state.goals.leisureWeeklyMax ?? 0))}.</p> : null}
           {groceryOver ? <p>O mercado de {monthTitle(month).split(' de ')[0].toLowerCase()} passou da meta em {formatBRL(grocery.total - (goal.amount ?? 0))}.</p> : null}
+          {fuelOver ? <p>O combustível de {monthTitle(month).split(' de ')[0].toLowerCase()} passou da meta em {formatBRL(fuelSpent.total - (fuel.amount ?? 0))}.</p> : null}
         </div>
       ) : null}
 
@@ -191,6 +196,20 @@ export function Dashboard() {
           <BudgetMeter spent={grocery.total} goal={goal.amount} />
           <button type="button" onClick={() => setPage({ id: 'grocery' })} className="mt-4 text-sm font-medium text-moss">
             Ajustar meta de {monthTitle(month).split(' de ')[0].toLowerCase()}
+          </button>
+        </Panel>
+        <Panel
+          title="Combustível do mês"
+          action={
+            <Button variant="ghost" className="h-9 px-3" onClick={() => setPage({ id: 'fuel', compose: true })}>
+              Lançar
+            </Button>
+          }
+        >
+          <p className="mb-3 text-sm text-ink-soft">{fuel.override ? 'Meta ajustada só para este mês.' : 'Usando a meta padrão.'}</p>
+          <BudgetMeter spent={fuelSpent.total} goal={fuel.amount} />
+          <button type="button" onClick={() => setPage({ id: 'fuel' })} className="mt-4 text-sm font-medium text-moss">
+            Ver abastecimentos
           </button>
         </Panel>
       </div>

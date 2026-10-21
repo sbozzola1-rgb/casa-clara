@@ -7,18 +7,19 @@ import { Dashboard } from './pages/Dashboard.tsx'
 import { FixedPage } from './pages/FixedPage.tsx'
 import { GoalsPage } from './pages/GoalsPage.tsx'
 import { OverduePage } from './pages/OverduePage.tsx'
-import { GroceryPage, LeisurePage } from './pages/SpendingPages.tsx'
+import { FuelPage, GroceryPage, LeisurePage } from './pages/SpendingPages.tsx'
 import { HouseGate } from './auth.tsx'
 import { signOut } from './lib/cloud.ts'
 import { StoreProvider, useStore, type Page } from './state.tsx'
 
-const NAV: { id: Page['id']; label: string; icon: 'home' | 'late' | 'fixed' | 'card' | 'market' | 'leisure' | 'company' | 'goal' }[] = [
+const NAV: { id: Page['id']; label: string; icon: 'home' | 'late' | 'fixed' | 'card' | 'market' | 'leisure' | 'fuel' | 'company' | 'goal' }[] = [
   { id: 'dashboard', label: 'Início', icon: 'home' },
   { id: 'overdue', label: 'Vencidas', icon: 'late' },
   { id: 'fixed', label: 'Fixos', icon: 'fixed' },
   { id: 'cards', label: 'Cartões', icon: 'card' },
   { id: 'grocery', label: 'Mercado', icon: 'market' },
   { id: 'leisure', label: 'Lazer', icon: 'leisure' },
+  { id: 'fuel', label: 'Combustível', icon: 'fuel' },
   { id: 'company', label: 'Empresa', icon: 'company' },
   { id: 'goals', label: 'Metas', icon: 'goal' },
 ]
@@ -133,6 +134,7 @@ function Shell() {
           {page.id === 'card' ? <CardDetail key={page.cardId} cardId={page.cardId} /> : null}
           {page.id === 'grocery' ? <GroceryPage key={page.compose ? 'compose' : 'grocery'} /> : null}
           {page.id === 'leisure' ? <LeisurePage key={page.compose ? 'compose' : 'leisure'} /> : null}
+          {page.id === 'fuel' ? <FuelPage key={page.compose ? 'compose' : 'fuel'} /> : null}
           {page.id === 'company' ? <CompanyPage /> : null}
           {page.id === 'goals' ? <GoalsPage /> : null}
         </main>
@@ -200,6 +202,7 @@ function NavIcon({ name }: { name: (typeof NAV)[number]['icon'] }) {
   if (name === 'card') return <Icon path="M3 6.5h14v8H3v-8Zm0 3h14" />
   if (name === 'market') return <Icon path="M4 8h12l-1 7H5L4 8Zm2-2.5a4 4 0 0 1 8 0" />
   if (name === 'leisure') return <Icon path="M4 13.5 8 4l2 5 2-2 4 6.5" />
+  if (name === 'fuel') return <Icon path="M7 16.5V6.5h5v10M9 6.5V4.5h1.5M12 9h2.2a1.5 1.5 0 0 1 0 3H12" />
   if (name === 'company') return <Icon path="M4 16.5h12M6.5 16.5V5.5h7v11M8.2 8h1.2M10.6 8h1.2M8.2 10.5h1.2M10.6 10.5h1.2" />
   return <Icon path="M10 3.5v13M6 7.5h5.5a2.5 2.5 0 0 1 0 5H6" />
 }

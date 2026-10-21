@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { GroceryInflowDialog, MoneyDialog, SpendDialog } from '../components/dialogs.tsx'
 import { BudgetMeter, Button, CompareBars, EmptyState, PageIntro, Panel } from '../components/ui.tsx'
 import { addDays, formatFriendly, monthName, monthRange, monthTitle, startOfWeek, weekTitle } from '../lib/dates.ts'
-import { groceryGoal, groceryInflowApplies, grocerySeries, leisureSeries, spentInRange } from '../lib/finance.ts'
+import { fuelGoal, fuelSeries, groceryGoal, groceryInflowApplies, grocerySeries, leisureSeries, spentInRange } from '../lib/finance.ts'
 import { formatBRL } from '../lib/money.ts'
 import type { GroceryInflow, SpendEntry } from '../lib/types.ts'
 import { useStore } from '../state.tsx'
@@ -93,6 +93,72 @@ export function GroceryPage() {
           initial={goal.amount}
           onClose={() => setAdjusting(false)}
           onSave={(value) => setGroceryMonth(month, value)}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+export function FuelPage() {
+  const { state, month, today, page, setPage, setFuelMonth } = useStore()
+  const [dialog, setDialog] = useState<SpendEntry | null | 'new'>(() => (page.id === 'fuel' && page.compose ? 'new' : null))
+  const [adjusting, setAdjusting] = useState(false)
+  const range = monthRange(month)
+  const spent = spentInRange(state, 'combustivel', range.start, range.end)
+  const goal = fuelGoal(state, month)
+  const series = fuelSeries(state, month)
+
+  const close = () => {
+    setDialog(null)
+    setPage({ id: 'fuel' })
+  }
+
+  return (
+    <div>
+      <PageIntro
+        eyebrow="Meta mensal"
+        title="Combustível"
+        description="Cada abastecimento entra pelo valor cheio, no mês da data. A meta pode ser a padrão ou só deste mês."
+        action={<Button onClick={() => setDialog('new')}>Lançar abastecimento</Button>}
+      />
+
+      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <Panel title={monthTitle(month)}>
+          <BudgetMeter spent={spent.total} goal={goal.amount} />
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => setAdjusting(true)}>
+              Ajustar meta de {monthName(month)}
+            </Button>
+            {goal.override ? (
+              <Button variant="ghost" onClick={() => setFuelMonth(month, null)}>
+                Voltar à meta padrão
+              </Button>
+            ) : null}
+          </div>
+          <p className="mt-4 text-sm leading-relaxed text-ink-soft">
+            {goal.override
+              ? `Este mês está em ${formatBRL(goal.amount ?? 0)}. A meta padrão continua ${state.goals.fuelMonthlyDefault == null ? 'sem valor' : formatBRL(state.goals.fuelMonthlyDefault)}.`
+              : 'Este mês usa a meta padrão. Um ajuste vale só para o mês que está aberto em cima.'}
+          </p>
+        </Panel>
+        <Panel title="Últimos meses">
+          <CompareBars items={series.map((item) => ({ key: item.month, label: item.label, spent: item.spent, goal: item.goal }))} />
+        </Panel>
+      </div>
+
+      <section className="mt-4">
+        <EntryList entries={spent.entries} today={today} empty="Nenhum abastecimento neste mês." onEdit={setDialog} />
+      </section>
+
+      {dialog !== null ? <SpendDialog category="combustivel" entry={dialog === 'new' ? null : dialog} onClose={close} /> : null}
+      {adjusting ? (
+        <MoneyDialog
+          title={`Meta de ${monthName(month)}`}
+          description="Vale só para o combustível deste mês. Os outros meses continuam na meta padrão."
+          label="Meta deste mês"
+          initial={goal.amount}
+          onClose={() => setAdjusting(false)}
+          onSave={(value) => setFuelMonth(month, value)}
         />
       ) : null}
     </div>

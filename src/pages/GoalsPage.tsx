@@ -2,15 +2,16 @@ import { useRef, useState } from 'react'
 import { MoneyDialog } from '../components/dialogs.tsx'
 import { Button, PageIntro, Panel } from '../components/ui.tsx'
 import { monthName, monthTitle } from '../lib/dates.ts'
-import { groceryGoal } from '../lib/finance.ts'
+import { fuelGoal, groceryGoal } from '../lib/finance.ts'
 import { formatISO } from '../lib/dates.ts'
 import { formatBRL } from '../lib/money.ts'
 import { useStore } from '../state.tsx'
 
 export function GoalsPage() {
-  const { state, month, setLeisureWeekly, setGroceryDefault, setGroceryMonth, replaceState, notify } = useStore()
+  const { state, month, setLeisureWeekly, setGroceryDefault, setGroceryMonth, setFuelDefault, setFuelMonth, replaceState, notify } = useStore()
   const goal = groceryGoal(state, month)
-  const [which, setWhich] = useState<'leisure' | 'default' | 'month' | null>(null)
+  const fuel = fuelGoal(state, month)
+  const [which, setWhich] = useState<'leisure' | 'default' | 'month' | 'fuel-default' | 'fuel-month' | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const download = () => {
@@ -40,7 +41,7 @@ export function GoalsPage() {
       <PageIntro
         eyebrow="Limites da casa"
         title="Metas"
-        description="O lazer tem um teto por semana. O mercado tem uma meta por mês, e esse mês pode ser diferente dos outros."
+        description="O lazer tem um teto por semana. Mercado e combustível têm meta por mês, e esse mês pode ser diferente dos outros."
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -74,6 +75,27 @@ export function GoalsPage() {
           </p>
           {goal.override ? (
             <button type="button" onClick={() => setGroceryMonth(month, null)} className="mt-3 text-sm font-medium text-moss">
+              Voltar {monthName(month)} para a meta padrão
+            </button>
+          ) : null}
+        </Panel>
+        <Panel title="Combustível">
+          <p className="text-sm text-ink-soft">Meta padrão do mês, usada quando não houver ajuste.</p>
+          <p className="mt-3 font-serif text-5xl tracking-tight tabular-nums">
+            {state.goals.fuelMonthlyDefault == null ? '—' : formatBRL(state.goals.fuelMonthlyDefault)}
+          </p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Button onClick={() => setWhich('fuel-default')}>Definir meta padrão</Button>
+            <Button variant="secondary" onClick={() => setWhich('fuel-month')}>
+              Ajustar {monthName(month)}
+            </Button>
+          </div>
+          <p className="mt-4 text-sm leading-relaxed text-ink-soft">
+            {monthTitle(month)} está em {fuel.amount == null ? 'aberto, sem meta' : formatBRL(fuel.amount)}
+            {fuel.override ? ' — ajuste só deste mês.' : ' — meta padrão.'}
+          </p>
+          {fuel.override ? (
+            <button type="button" onClick={() => setFuelMonth(month, null)} className="mt-3 text-sm font-medium text-moss">
               Voltar {monthName(month)} para a meta padrão
             </button>
           ) : null}
@@ -117,6 +139,26 @@ export function GoalsPage() {
           initial={state.goals.groceryMonthlyDefault}
           onClose={() => setWhich(null)}
           onSave={setGroceryDefault}
+        />
+      ) : null}
+      {which === 'fuel-default' ? (
+        <MoneyDialog
+          title="Meta padrão de combustível"
+          description="Vale para todo mês que você não ajustar à parte."
+          label="Meta mensal"
+          initial={state.goals.fuelMonthlyDefault}
+          onClose={() => setWhich(null)}
+          onSave={setFuelDefault}
+        />
+      ) : null}
+      {which === 'fuel-month' ? (
+        <MoneyDialog
+          title={`Combustível de ${monthName(month)}`}
+          description="Só este mês muda. A meta padrão fica onde está."
+          label="Meta deste mês"
+          initial={fuel.amount}
+          onClose={() => setWhich(null)}
+          onSave={(value) => setFuelMonth(month, value)}
         />
       ) : null}
       {which === 'month' ? (

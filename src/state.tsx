@@ -11,6 +11,7 @@ export type Page =
   | { id: 'card'; cardId: string }
   | { id: 'grocery'; compose?: boolean }
   | { id: 'leisure'; compose?: boolean }
+  | { id: 'fuel'; compose?: boolean }
   | { id: 'overdue' }
   | { id: 'company' }
   | { id: 'goals' }
@@ -41,6 +42,8 @@ interface Store {
   setLeisureWeekly: (value: number | null) => void
   setGroceryDefault: (value: number | null) => void
   setGroceryMonth: (month: string, value: number | null) => void
+  setFuelDefault: (value: number | null) => void
+  setFuelMonth: (month: string, value: number | null) => void
   upsertGroceryInflow: (entry: GroceryInflow) => void
   removeGroceryInflow: (id: string) => void
   replaceState: (input: unknown) => void
@@ -288,6 +291,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return { ...current, goals: { ...current.goals, groceryByMonth } }
         })
         notify(value == null ? 'Mês voltou para a meta padrão' : 'Meta do mês ajustada')
+      },
+      setFuelDefault: (fuelMonthlyDefault) => {
+        setState((current) => ({ ...current, goals: { ...current.goals, fuelMonthlyDefault } }))
+        notify('Meta padrão de combustível atualizada')
+      },
+      setFuelMonth: (targetMonth, value) => {
+        setState((current) => {
+          const fuelByMonth = { ...current.goals.fuelByMonth }
+          if (value == null) delete fuelByMonth[targetMonth]
+          else fuelByMonth[targetMonth] = value
+          return { ...current, goals: { ...current.goals, fuelByMonth } }
+        })
+        notify(value == null ? 'Mês voltou para a meta padrão' : 'Meta de combustível ajustada')
       },
       upsertGroceryInflow: (entry) => {
         setState((current) => ({

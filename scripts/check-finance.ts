@@ -1,5 +1,5 @@
 import { addMonthsClamped, parseDate, startOfWeek } from '../src/lib/dates.ts'
-import { groceryGoal, installmentSchedule, invoiceDueDate, invoiceForCard, invoiceMonthFor, limitUsed, monthFlow, overdueItems, spentInRange } from '../src/lib/finance.ts'
+import { fuelGoal, groceryGoal, installmentSchedule, invoiceDueDate, invoiceForCard, invoiceMonthFor, limitUsed, monthFlow, overdueItems, spentInRange } from '../src/lib/finance.ts'
 import { sanitize } from '../src/lib/storage.ts'
 import { emptyState, type AppState, type CreditCard, type Purchase } from '../src/lib/types.ts'
 
@@ -121,5 +121,14 @@ const valeMensal = {
   groceryInflows: [{ id: 'vale', name: 'Vale alimentação', amount: 400, month: '2026-10', repeat: 'monthly' as const }],
 }
 assert(groceryGoal(valeMensal, '2026-11').amount === 1900, 'vale mensal continua nos meses seguintes')
+
+const withFuel = {
+  ...emptyState(),
+  goals: { ...emptyState().goals, fuelMonthlyDefault: 600, fuelByMonth: { '2026-11': 700 } },
+  cashExpenses: [{ id: 'posto', description: 'Posto', amount: 180, date: '2026-10-20', category: 'combustivel' as const, method: 'pix' as const }],
+}
+assert(fuelGoal(withFuel, '2026-10').amount === 600, 'combustível de outubro usa a meta padrão')
+assert(fuelGoal(withFuel, '2026-11').amount === 700, 'combustível de novembro usa o ajuste do mês')
+assert(spentInRange(withFuel, 'combustivel', parseDate('2026-10-01'), parseDate('2026-10-31')).total === 180, 'abastecimento entra no mês da data')
 
 console.log('finanças ok')

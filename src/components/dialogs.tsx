@@ -433,7 +433,7 @@ export function PurchaseDialog({
     <>
       <Modal
         title={purchase ? 'Editar compra' : 'Nova compra'}
-        description="Mercado e lazer entram na meta pelo valor cheio, no dia da compra. A fatura recebe as parcelas."
+        description="Mercado, lazer e combustível entram na meta pelo valor cheio, no dia da compra. A fatura recebe as parcelas."
         onClose={onClose}
         footer={
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -493,7 +493,7 @@ export function PurchaseDialog({
       {confirming && purchase ? (
         <ConfirmDialog
           title="Excluir compra"
-          text="A compra sai do cartão e, se for mercado ou lazer, sai da meta também."
+          text="A compra sai do cartão e, se for mercado, lazer ou combustível, sai da meta também."
           confirmLabel="Excluir"
           onClose={() => setConfirming(false)}
           onConfirm={() => {
@@ -511,7 +511,7 @@ export function SpendDialog({
   entry,
   onClose,
 }: {
-  category: 'mercado' | 'lazer'
+  category: 'mercado' | 'lazer' | 'combustivel'
   entry: SpendEntry | null
   onClose: () => void
 }) {
@@ -526,7 +526,7 @@ export function SpendDialog({
   const [installments, setInstallments] = useState(String(existingPurchase?.installments ?? 1))
   const [error, setError] = useState('')
   const [confirming, setConfirming] = useState(false)
-  const title = category === 'mercado' ? 'Compra de mercado' : 'Gasto de lazer'
+  const title = category === 'mercado' ? 'Compra de mercado' : category === 'combustivel' ? 'Abastecimento' : 'Gasto de lazer'
 
   const save = () => {
     const parsedAmount = parseMoney(amount)
@@ -608,7 +608,7 @@ export function SpendDialog({
               className={fieldClass}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              placeholder={category === 'mercado' ? 'Ex.: Hortifruti' : 'Ex.: Cinema'}
+              placeholder={category === 'mercado' ? 'Ex.: Hortifruti' : category === 'combustivel' ? 'Ex.: Posto' : 'Ex.: Cinema'}
             />
           </Field>
           <MoneyField label="Valor" value={amount} onChange={setAmount} />

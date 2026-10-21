@@ -16,6 +16,7 @@ export const FIXED_CATEGORIES = [
 export const SPEND_CATEGORIES = [
   { id: 'mercado', label: 'Mercado' },
   { id: 'lazer', label: 'Lazer' },
+  { id: 'combustivel', label: 'Combustível' },
   { id: 'moradia', label: 'Moradia' },
   { id: 'contas', label: 'Contas' },
   { id: 'saude', label: 'Saúde' },
@@ -25,6 +26,8 @@ export const SPEND_CATEGORIES = [
 ] as const
 
 export type SpendingCategory = (typeof SPEND_CATEGORIES)[number]['id']
+
+export type BudgetCategory = 'mercado' | 'lazer' | 'combustivel'
 
 export type PaymentMethod = 'pix' | 'debito' | 'dinheiro'
 
@@ -117,7 +120,7 @@ export interface CashExpense {
   description: string
   amount: number
   date: string
-  category: 'mercado' | 'lazer'
+  category: BudgetCategory
   method: PaymentMethod
 }
 
@@ -125,6 +128,8 @@ export interface Goals {
   leisureWeeklyMax: number | null
   groceryMonthlyDefault: number | null
   groceryByMonth: Record<string, number>
+  fuelMonthlyDefault: number | null
+  fuelByMonth: Record<string, number>
 }
 
 export interface GroceryInflow {
@@ -186,7 +191,7 @@ export interface SpendEntry {
   description: string
   amount: number
   date: string
-  category: 'mercado' | 'lazer'
+  category: BudgetCategory
   detail: string
   cardId?: string
 }
@@ -206,6 +211,8 @@ export function emptyState(): AppState {
       leisureWeeklyMax: null,
       groceryMonthlyDefault: null,
       groceryByMonth: {},
+      fuelMonthlyDefault: null,
+      fuelByMonth: {},
     },
     groceryInflows: [],
   }
