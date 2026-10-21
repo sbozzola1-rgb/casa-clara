@@ -61,7 +61,7 @@ function Shell({ onLeave }: { onLeave: () => void }) {
             onClose={() => setGate(null)}
             onReady={() => {
               setGate(null)
-              notify('Área dos pais aberta')
+              notify('Agora é a mamãe')
             }}
           />
         ) : null}
@@ -77,7 +77,7 @@ function Shell({ onLeave }: { onLeave: () => void }) {
       <aside className="relative z-10 hidden md:flex md:flex-col md:px-4 md:py-6">
         <div className="px-3 pb-6">
           <p className="font-display text-4xl leading-none">Cantinho</p>
-          <p className="mt-1 text-sm font-extrabold text-[var(--soft)]">Rotina de {profile.name}</p>
+          <p className="mt-1 text-sm font-extrabold text-[var(--soft)]">{role === 'parent' ? 'Visualização da mamãe' : `Visualização de ${profile.name}`}</p>
         </div>
         <nav className="grid gap-1">
           {TABS.map((item) => (
@@ -97,31 +97,29 @@ function Shell({ onLeave }: { onLeave: () => void }) {
 
       <div className="relative z-10 min-w-0">
         <header className="sticky top-0 z-20 px-4 py-4 backdrop-blur md:px-8">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-3">
-              <Avatar look={profile.avatar} size={56} />
+              {role === 'parent' ? (
+                <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-white text-3xl shadow-sm" aria-hidden="true">👩</span>
+              ) : (
+                <Avatar look={profile.avatar} size={56} />
+              )}
               <div className="min-w-0">
                 <p className="truncate text-xs font-extrabold tracking-wide text-[var(--soft)] uppercase">{formatLong(today)}</p>
-                <p className="font-display truncate text-2xl">Oi, {profile.name}!</p>
+                <p className="font-display truncate text-2xl">Oi, {role === 'parent' ? 'mamãe' : profile.name}!</p>
               </div>
             </div>
-            {role === 'parent' ? (
-              <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Who name={profile.name} look={profile.avatar} role={role} onChild={() => { if (role === 'parent') { leaveParent(); notify(`Agora é a ${profile.name}`) } }} onParent={() => { if (role !== 'parent') openGate() }} />
+              {role === 'parent' ? (
                 <button type="button" className="btn-ghost min-h-11 px-4 text-sm" onClick={() => setSettings(true)}>
                   Ajustes
                 </button>
-                <button type="button" className="btn-primary min-h-11 px-4 text-sm" onClick={leaveParent}>
-                  Ver como ela vê
-                </button>
-              </div>
-            ) : (
-              <button type="button" className="btn-ghost min-h-11 px-4 text-sm" onClick={openGate}>
-                Pais
-              </button>
-            )}
+              ) : null}
+            </div>
           </div>
           {role === 'parent' ? (
-            <p className="mt-3 rounded-full bg-white/80 px-4 py-2 text-sm font-extrabold text-fuchsia-600">Área dos pais — ela só consegue marcar como feito.</p>
+            <p className="mt-3 rounded-full bg-white/80 px-4 py-2 text-sm font-extrabold text-fuchsia-600">Visualização da mamãe. A {profile.name} só marca como feito.</p>
           ) : null}
         </header>
 
@@ -160,7 +158,7 @@ function Shell({ onLeave }: { onLeave: () => void }) {
           onClose={() => setGate(null)}
           onReady={() => {
             setGate(null)
-            notify('Área dos pais aberta')
+            notify('Agora é a mamãe')
           }}
         />
       ) : null}
@@ -178,10 +176,25 @@ function Shell({ onLeave }: { onLeave: () => void }) {
         />
       ) : null}
       {toast ? (
-        <div role="status" className="fixed top-6 left-1/2 z-[75] -translate-x-1/2 rounded-full bg-[#5b3a63] px-5 py-2 font-extrabold text-white shadow-lg">
+        <div role="status" className="fixed bottom-24 left-1/2 z-[75] -translate-x-1/2 rounded-full bg-[#5b3a63] px-5 py-2 font-extrabold text-white shadow-lg md:bottom-8">
           {toast}
         </div>
       ) : null}
+    </div>
+  )
+}
+
+function Who({ name, look, role, onChild, onParent }: { name: string; look: AvatarLook; role: 'child' | 'parent'; onChild: () => void; onParent: () => void }) {
+  return (
+    <div className="flex rounded-full bg-white/80 p-1" role="group" aria-label="Visualização">
+      <button type="button" aria-pressed={role === 'child'} onClick={onChild} className="choice flex items-center gap-2">
+        <Avatar look={look} size={28} />
+        {name}
+      </button>
+      <button type="button" aria-pressed={role === 'parent'} onClick={onParent} className="choice flex items-center gap-2">
+        <span aria-hidden="true">👩</span>
+        Mamãe
+      </button>
     </div>
   )
 }
@@ -312,9 +325,9 @@ function PinGate({ mode, onMode, onClose, onReady }: { mode: Gate; onMode: (mode
     onMode('create')
   }
 
-  const title = mode === 'enter' ? 'Área dos pais' : mode === 'confirm' ? 'Repita o PIN' : mode === 'word' ? 'Palavra só sua' : mode === 'forgot' ? 'Recuperar o PIN' : 'Crie um PIN'
+  const title = mode === 'enter' ? 'Entrar como a mamãe' : mode === 'confirm' ? 'Repita o PIN' : mode === 'word' ? 'Palavra só sua' : mode === 'forgot' ? 'Recuperar o PIN' : 'Crie um PIN'
   const description = mode === 'enter'
-    ? 'O PIN abre o cadastro. Ela continua só marcando como feito.'
+    ? `O PIN abre a visualização da mamãe. A ${state.profile?.name ?? 'Laura'} continua só marcando como feito.`
     : mode === 'word'
       ? 'Guarde uma palavra que ela não saiba. Ela recupera o PIN se você esquecer.'
       : mode === 'forgot'

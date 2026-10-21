@@ -283,7 +283,7 @@ function CreateAlarmButton({ kind }: { kind: 'activity' | 'meal' | 'homework' })
 }
 
 export function TodayScreen() {
-  const { state, today } = useRoutine()
+  const { state, role, today } = useRoutine()
   const check = useCheck()
   const [showAnswer, setShowAnswer] = useState(false)
   const day = dateKey(today)
@@ -325,7 +325,7 @@ export function TodayScreen() {
     <div className="grid gap-4 lg:grid-cols-2">
       <section className="card px-6 py-6 lg:col-span-2">
         <p className="text-sm font-extrabold tracking-wide text-[var(--soft)] uppercase">{formatLong(today)}</p>
-        <h1 className="font-display mt-1 text-4xl md:text-5xl">Oi, {profile?.name}!</h1>
+        <h1 className="font-display mt-1 text-4xl md:text-5xl">Oi, {role === 'parent' ? 'mamãe' : profile?.name}!</h1>
         <p className="mt-2 text-[var(--soft)]">{pending.length === 0 ? 'Nada pendente por aqui.' : `Ainda ${pending.length === 1 ? 'falta' : 'faltam'} ${pending.length} · ${finished.length} ${finished.length === 1 ? 'feita' : 'feitas'}`}</p>
       </section>
 
