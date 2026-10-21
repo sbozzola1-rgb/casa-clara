@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { activityOccurs, dateKey, eventKey, isDue, type ActivityItem, type AlarmItem } from './model.ts'
+import { activityOccurs, alarmOnDay, dateKey, eventKey, isDue, type ActivityItem, type AlarmItem } from './model.ts'
 import { notifyDevice, startAlarmSound, stopAlarmSound, unlockAudio } from './sound.ts'
 import { useRoutine } from './store.tsx'
 
@@ -22,7 +22,7 @@ export function RoutineScheduler() {
       const day = dateKey(now)
       const dueAlarms = state.alarms.filter((alarm) => {
         const key = eventKey('alarm', alarm.id, day)
-        return alarm.enabled && alarm.days.includes(now.getDay()) && isDue(alarm.time, now) && !state.rung[key] && !seen.has(key)
+        return alarmOnDay(alarm, now) && isDue(alarm.time, now) && !state.rung[key] && !seen.has(key)
       })
       if (dueAlarms.length > 0) {
         for (const alarm of dueAlarms) {

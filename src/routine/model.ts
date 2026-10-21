@@ -47,6 +47,7 @@ export type AlarmItem = {
   time: string
   days: number[]
   enabled: boolean
+  on: string
 }
 
 export type ActivityItem = {
@@ -97,13 +98,12 @@ export type RoutineState = {
   notified: Record<string, true>
 }
 
-export type TabId = 'hoje' | 'escola' | 'licao' | 'despertador' | 'atividades' | 'refeicoes' | 'notas' | 'pix'
+export type TabId = 'hoje' | 'escola' | 'licao' | 'atividades' | 'refeicoes' | 'notas' | 'pix'
 
 export const TABS: { id: TabId; label: string; emoji: string }[] = [
   { id: 'hoje', label: 'Hoje', emoji: '🌸' },
   { id: 'escola', label: 'Escola', emoji: '🎒' },
   { id: 'licao', label: 'Lição', emoji: '✏️' },
-  { id: 'despertador', label: 'Despertador', emoji: '⏰' },
   { id: 'atividades', label: 'Atividades', emoji: '⭐' },
   { id: 'refeicoes', label: 'Refeições', emoji: '🍎' },
   { id: 'notas', label: 'Notas', emoji: '🌈' },
@@ -304,6 +304,33 @@ export function isDue(time: string, now: Date, windowMinutes = 15) {
   return delta >= 0 && delta <= windowMinutes
 }
 
+export function alarmOnDay(alarm: AlarmItem, day: Date) {
+  if (!alarm.enabled || !/^\d{2}:\d{2}$/.test(alarm.time) || alarm.days.length === 0) return false
+  if (alarm.on && alarm.on !== dateKey(day)) return false
+  return alarm.days.includes(day.getDay())
+}
+
+const JOKES: { ask: string; answer: string }[] = [
+  { ask: 'Por que o livro de matemática ficou triste?', answer: 'Porque tinha muitos problemas.' },
+  { ask: 'O que o zero disse para o oito?', answer: 'Que cinto bonito!' },
+  { ask: 'Por que a planta não responde?', answer: 'Porque está ocupada, crescendo.' },
+  { ask: 'Qual é o animal que não vale nada?', answer: 'O javali.' },
+  { ask: 'O que a abelha fala quando chega em casa?', answer: 'Já mel!' },
+  { ask: 'Por que o computador foi ao médico?', answer: 'Porque tinha um vírus.' },
+  { ask: 'O que é um pontinho amarelo no céu?', answer: 'Um yellowcóptero.' },
+  { ask: 'Por que a galinha atravessou a rua?', answer: 'Para chegar do outro lado.' },
+  { ask: 'Qual é o rei dos queijos?', answer: 'O reiqueijão.' },
+  { ask: 'O que a foca falou para a outra?', answer: 'O que é que foi?' },
+  { ask: 'Por que a vassoura não dorme?', answer: 'Porque ela só sabe varrer.' },
+  { ask: 'Qual é o cúmulo da força?', answer: 'Dobrar a esquina.' },
+]
+
+export function dailyJoke(date: Date) {
+  const key = dateKey(date)
+  const index = [...key].reduce((sum, char) => sum + char.charCodeAt(0), 0) % JOKES.length
+  return JOKES[index]
+}
+
 export function nextAlarm(alarms: AlarmItem[], now: Date) {
   const enabled = alarms.filter((alarm) => alarm.enabled && /^\d{2}:\d{2}$/.test(alarm.time) && alarm.days.length > 0)
   let best: { alarm: AlarmItem; at: Date } | null = null
@@ -312,7 +339,7 @@ export function nextAlarm(alarms: AlarmItem[], now: Date) {
     day.setDate(now.getDate() + offset)
     day.setSeconds(0, 0)
     for (const alarm of enabled) {
-      if (!alarm.days.includes(day.getDay())) continue
+      if (!alarmOnDay(alarm, day)) continue
       const [hour, minute] = alarm.time.split(':').map(Number)
       const at = new Date(day)
       at.setHours(hour, minute, 0, 0)
@@ -472,7 +499,8 @@ export function sanitize(input: unknown): RoutineState {
         if (!item || typeof item !== 'object' || typeof item.id !== 'string') return []
         const label = text(item.label).trim().slice(0, 60)
         if (!label) return []
-        return [{ id: item.id, label, emoji: emoji(item.emoji, '⏰'), time: clock(item.time, '07:00'), days: days(item.days, ALL_DAYS), enabled: item.enabled !== false }]
+        const on = /^\d{4}-\d{2}-\d{2}$/.test(text(item.on)) ? text(item.on) : ''
+        return [{ id: item.id, label, emoji: emoji(item.emoji, '⏰'), time: clock(item.time, '07:00'), days: days(item.days, ALL_DAYS), enabled: item.enabled !== false, on }]
       })
     : []
 

@@ -4,7 +4,7 @@ import { leaveRoutine, pinRoutine, routinePinned } from './door.ts'
 import { dateKey, defaultAvatar, formatLong, TABS, type AvatarLook } from './model.ts'
 import './routine.css'
 import { RoutineScheduler } from './scheduler.tsx'
-import { ActivityScreen, AlarmScreen, GradeScreen, HomeworkScreen, MealScreen, PixScreen, SchoolScreen, TodayScreen } from './screens.tsx'
+import { ActivityScreen, GradeScreen, HomeworkScreen, MealScreen, PixScreen, SchoolScreen, TodayScreen } from './screens.tsx'
 import { askNotificationPermission } from './sound.ts'
 import { RoutineProvider, useRoutine } from './store.tsx'
 import { Field, Modal, PinPad, TextInput } from './ui.tsx'
@@ -129,7 +129,6 @@ function Shell({ onLeave }: { onLeave: () => void }) {
           {tab === 'hoje' ? <TodayScreen /> : null}
           {tab === 'escola' ? <SchoolScreen /> : null}
           {tab === 'licao' ? <HomeworkScreen /> : null}
-          {tab === 'despertador' ? <AlarmScreen /> : null}
           {tab === 'atividades' ? <ActivityScreen /> : null}
           {tab === 'refeicoes' ? <MealScreen /> : null}
           {tab === 'notas' ? <GradeScreen /> : null}

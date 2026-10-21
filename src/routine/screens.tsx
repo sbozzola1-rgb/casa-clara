@@ -1,7 +1,8 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import {
   activityOccurs,
   ALL_DAYS,
+  dailyJoke,
   dateKey,
   daysLabel,
   doneKey,
@@ -11,7 +12,6 @@ import {
   homeworkKey,
   isSwimWeek,
   money,
-  nextAlarm,
   occursOn,
   pixKey,
   recentDates,
@@ -23,7 +23,6 @@ import {
   todayTasks,
   uid,
   type ActivityItem,
-  type AlarmItem,
   type GradeItem,
   type HomeworkItem,
   type MealItem,
@@ -92,82 +91,217 @@ function atDate(iso: string) {
   return new Date(year, (month ?? 1) - 1, day ?? 1)
 }
 
-export function TodayScreen() {
-  const { state, role, today, setTab } = useRoutine()
-  const check = useCheck()
-  const tasks = todayTasks(state, today)
-  const done = tasks.filter((task) => task.done).length
-  const upcoming = nextAlarm(state.alarms, today)
-  const soon = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 2)
-  const soonLimit = dateKey(soon)
-  const lessons = state.homework.filter((item) => !state.done[homeworkKey(item.id)] && item.due <= soonLimit)
-  const profile = state.profile
+function CreateAlarmButton({ kind }: { kind: 'activity' | 'meal' | 'homework' }) {
+  const { state, saveAlarm, notify } = useRoutine()
+  const [open, setOpen] = useState(false)
+  const [sourceId, setSourceId] = useState('')
+  const [time, setTime] = useState('16:00')
+  const [days, setDays] = useState<number[]>(SCHOOL_DAYS)
+  const [error, setError] = useState('')
+  const choices = kind === 'activity' ? state.activities : kind === 'meal' ? state.meals : state.homework
+  const picked = choices.find((item) => item.id === sourceId)
+
+  const fill = (id: string) => {
+    setSourceId(id)
+    if (kind === 'activity') {
+      const item = state.activities.find((choice) => choice.id === id)
+      if (!item) return
+      setTime(item.time)
+      setDays(item.frequency === 'daily' ? ALL_DAYS : item.days)
+    }
+    if (kind === 'meal') {
+      const item = state.meals.find((choice) => choice.id === id)
+      if (!item) return
+      setTime(item.time)
+      setDays(item.days)
+    }
+    if (kind === 'homework') {
+      const item = state.homework.find((choice) => choice.id === id)
+      if (!item) return
+      setDays([atDate(item.due).getDay()])
+    }
+  }
+
+  const start = () => {
+    setError('')
+    const first = choices[0]
+    setTime(first && 'time' in first ? first.time : '16:00')
+    setDays(SCHOOL_DAYS)
+    setSourceId('')
+    if (first) fill(first.id)
+    setOpen(true)
+  }
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    if (!picked) {
+      setError(kind === 'meal' ? 'Cadastre uma refeição primeiro.' : kind === 'homework' ? 'Cadastre uma lição primeiro.' : 'Cadastre uma atividade primeiro.')
+      return
+    }
+    if (!time || days.length === 0) {
+      setError('Escolha o horário e pelo menos um dia.')
+      return
+    }
+    saveAlarm({
+      id: `wake-${kind}-${picked.id}`,
+      label: picked.title,
+      emoji: picked.emoji,
+      time,
+      days,
+      enabled: true,
+      on: kind === 'homework' && 'due' in picked ? picked.due : '',
+    })
+    void askNotificationPermission()
+    notify('Despertador criado')
+    setOpen(false)
+  }
 
   return (
-    <div className="grid gap-4">
-      <section className="card overflow-hidden px-6 py-6 md:px-8">
-        <p className="text-sm font-extrabold tracking-wide text-[var(--soft)] uppercase">Cantinho de hoje</p>
+    <>
+      <button type="button" className="btn-soft" onClick={start}>
+        Criar despertador
+      </button>
+      {open ? (
+        <FormModal title="Criar despertador" onClose={() => setOpen(false)} onSubmit={submit} submitLabel="Criar">
+          <Field label={kind === 'meal' ? 'Refeição' : kind === 'homework' ? 'Lição' : 'Atividade'}>
+            <select className="field-input" value={sourceId} onChange={(event) => fill(event.target.value)}>
+              {choices.length === 0 ? <option value="">Nenhuma ainda</option> : null}
+              {choices.map((item) => (
+                <option key={item.id} value={item.id}>{item.emoji} {item.title}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Horário">
+            <TextInput type="time" value={time} onChange={(event) => setTime(event.target.value)} />
+          </Field>
+          {kind === 'homework' && picked && 'due' in picked ? (
+            <p className="text-sm font-bold text-[var(--soft)]">Toca no dia da entrega, {formatShort(picked.due)}.</p>
+          ) : (
+            <DayField value={days} onChange={setDays} />
+          )}
+          {error ? <p className="text-sm font-bold text-rose-500">{error}</p> : null}
+        </FormModal>
+      ) : null}
+    </>
+  )
+}
+
+export function TodayScreen() {
+  const { state, today } = useRoutine()
+  const check = useCheck()
+  const [showAnswer, setShowAnswer] = useState(false)
+  const day = dateKey(today)
+  const tasks = todayTasks(state, today)
+  const homeworkCards = state.homework.filter((item) => item.due <= day && (!state.done[homeworkKey(item.id)] || item.due === day)).map((item) => ({
+    kind: 'homework' as const,
+    id: item.id,
+    emoji: item.emoji,
+    title: item.title,
+    time: item.due === day ? 'Para hoje' : 'Atrasada',
+    done: Boolean(state.done[homeworkKey(item.id)]),
+    pix: false,
+  }))
+  const all = [...tasks, ...homeworkCards]
+  const pending = all.filter((item) => !item.done)
+  const finished = all.filter((item) => item.done)
+  const routine = state.school.filter((item) => schoolOccurs(item, today)).sort((a, b) => a.start.localeCompare(b.start))
+  const materials = routine.filter((item) => item.materials.trim())
+  const exam = routine.some((item) => item.title.toLocaleLowerCase('pt-BR').includes('avalia'))
+  const joke = dailyJoke(today)
+  const profile = state.profile
+  const card = (task: (typeof all)[number]) => (
+    <ItemCard
+      key={`${task.kind}-${task.id}`}
+      emoji={task.emoji}
+      title={task.title}
+      meta={[task.time, task.kind === 'meal' ? 'Refeição' : task.kind === 'homework' ? 'Lição' : 'Atividade', task.pix ? 'Tem Pix' : ''].filter(Boolean).join(' · ')}
+      done={task.done}
+      canToggle
+      onToggle={() => check(task.kind, task.id, task.done)}
+    />
+  )
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <section className="card px-6 py-6 lg:col-span-2">
+        <p className="text-sm font-extrabold tracking-wide text-[var(--soft)] uppercase">{formatLong(today)}</p>
         <h1 className="font-display mt-1 text-4xl md:text-5xl">Oi, {profile?.name}!</h1>
-        <p className="mt-2 max-w-lg text-lg text-[var(--soft)]">
-          {tasks.length === 0
-            ? 'As atividades e as refeições aparecem aqui. A escola fica no calendário.'
-            : done === tasks.length
-              ? 'Você completou tudo de hoje. Que dia lindo!'
-              : 'Marque cada coisinha quando terminar.'}
-        </p>
-        <div className="mt-5 h-3 overflow-hidden rounded-full bg-white">
-          <div className="h-full rounded-full bg-gradient-to-r from-pink-400 to-violet-400" style={{ width: `${tasks.length === 0 ? 0 : Math.round((done / tasks.length) * 100)}%` }} />
-        </div>
-        <p className="mt-2 text-sm font-extrabold text-[var(--soft)]">{tasks.length === 0 ? 'Nada marcado para hoje' : `${done} de ${tasks.length} prontinhas`}</p>
+        <p className="mt-2 text-[var(--soft)]">{pending.length === 0 ? 'Nada pendente por aqui.' : `Ainda ${pending.length === 1 ? 'falta' : 'faltam'} ${pending.length} · ${finished.length} ${finished.length === 1 ? 'feita' : 'feitas'}`}</p>
       </section>
 
-      {upcoming ? (
-        <button type="button" onClick={() => setTab('despertador')} className="card flex items-center gap-4 px-5 py-4 text-left">
-          <span className="text-4xl">{upcoming.alarm.emoji}</span>
-          <span>
-            <span className="block text-sm font-extrabold text-[var(--soft)]">Próximo despertador</span>
-            <span className="font-display block text-2xl">
-              {upcoming.alarm.time} · {upcoming.alarm.label}
-            </span>
-          </span>
-        </button>
-      ) : null}
-
-      {tasks.length === 0 ? (
-        <EmptyState emoji="🌸" title="Hoje está livre" text={role === 'parent' ? 'Cadastre as atividades e as refeições. A escola fica no calendário.' : 'A mamãe ainda vai montar o seu dia.'} />
-      ) : (
-        <div className="grid gap-3">
-          {tasks.map((task) => (
-            <ItemCard
-              key={`${task.kind}-${task.id}`}
-              emoji={task.emoji}
-              title={task.title}
-              meta={[task.time, task.kind === 'meal' ? 'Refeição' : 'Atividade', task.pix ? 'Tem Pix' : ''].filter(Boolean).join(' · ')}
-              done={task.done}
-              canToggle
-              onToggle={() => check(task.kind, task.id, task.done)}
-            />
-          ))}
-        </div>
-      )}
-
-      {lessons.length > 0 ? (
-        <section>
-          <h2 className="font-display mb-3 text-2xl">Lição chegando</h2>
-          <div className="grid gap-3">
-            {lessons.map((item) => (
-              <ItemCard
-                key={item.id}
-                emoji={item.emoji}
-                title={item.title}
-                meta={`${item.subject} · ${item.due === dateKey(today) ? 'Para hoje' : item.due < dateKey(today) ? 'Atrasada' : `Até ${formatShort(item.due)}`}`}
-                canToggle
-                onToggle={() => check('homework', item.id, false)}
-              />
-            ))}
-          </div>
+      {exam ? (
+        <section className="rounded-[1.75rem] px-6 py-6 text-center shadow-lg lg:col-span-2" style={{ background: 'linear-gradient(135deg, #fbcfe8, #ddd6fe)' }}>
+          <p className="text-4xl">🌟</p>
+          <h2 className="font-display mt-2 text-4xl">Boa sorte, Laurinha!</h2>
+          <p className="mt-1 font-extrabold">Hoje tem prova. Você consegue.</p>
         </section>
       ) : null}
+
+      <section className="card px-6 py-5">
+        <h2 className="font-display text-2xl">Ainda falta fazer</h2>
+        {pending.length === 0 ? (
+          <p className="mt-3 text-[var(--soft)]">Tudo de hoje já foi feito.</p>
+        ) : (
+          <div className="mt-3 grid gap-3">{pending.map(card)}</div>
+        )}
+      </section>
+
+      <section className="card px-6 py-5">
+        <h2 className="font-display text-2xl">Feitas</h2>
+        {finished.length === 0 ? (
+          <p className="mt-3 text-[var(--soft)]">Quando terminar, elas aparecem aqui.</p>
+        ) : (
+          <div className="mt-3 grid gap-3">{finished.map(card)}</div>
+        )}
+      </section>
+
+      <section className="card px-6 py-5">
+        <h2 className="font-display text-2xl">Rotina do dia</h2>
+        {routine.length === 0 ? (
+          <p className="mt-3 text-[var(--soft)]">Hoje não tem aula no cronograma.</p>
+        ) : (
+          <ul className="mt-3 grid gap-2">
+            {routine.map((item) => (
+              <li key={item.id} className="flex items-center gap-3 rounded-2xl bg-white px-3 py-2">
+                <span className="text-2xl">{item.emoji}</span>
+                <span>
+                  <span className="block font-extrabold">{item.title}</span>
+                  <span className="text-sm font-bold text-[var(--soft)]">{item.end ? `${item.start} – ${item.end}` : item.start}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="card px-6 py-5">
+        <h2 className="font-display text-2xl">Arrume o material</h2>
+        <p className="mt-1 text-sm font-bold text-[var(--soft)]">Antes de sair, confira a mochila.</p>
+        {materials.length === 0 ? (
+          <p className="mt-3 text-[var(--soft)]">Nada extra para levar hoje.</p>
+        ) : (
+          <ul className="mt-3 grid gap-2">
+            {materials.map((item) => (
+              <li key={item.id} className="rounded-2xl bg-white px-3 py-2">
+                <span className="block font-extrabold">{item.emoji} {item.title}</span>
+                <span className="text-sm text-[var(--soft)]">{item.materials}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="card px-6 py-5 lg:col-span-2">
+        <h2 className="font-display text-2xl">Piada do dia</h2>
+        <p className="mt-3 text-lg font-extrabold">{joke.ask}</p>
+        {showAnswer ? (
+          <p className="mt-2 text-lg">{joke.answer}</p>
+        ) : (
+          <button type="button" className="btn-soft mt-3" onClick={() => setShowAnswer(true)}>
+            Ver a resposta
+          </button>
+        )}
+      </section>
     </div>
   )
 }
@@ -409,7 +543,7 @@ export function HomeworkScreen() {
       <PageHeader
         title="Lição de casa"
         text={role === 'parent' ? 'Cadastre o que precisa ser entregue.' : 'Toque em Feito quando terminar a lição.'}
-        action={role === 'parent' ? <AddButton label="Nova lição" onClick={() => { setError(''); setDraft({ id: uid(), subject: 'Matemática', title: '', due: todayIso, note: '', emoji: '✏️' }) }} /> : null}
+        action={<div className="flex flex-wrap gap-2">{role === 'parent' ? <AddButton label="Nova lição" onClick={() => { setError(''); setDraft({ id: uid(), subject: 'Matemática', title: '', due: todayIso, note: '', emoji: '✏️' }) }} /> : null}<CreateAlarmButton kind="homework" /></div>}
       />
       {state.homework.length === 0 ? (
         <EmptyState emoji="✏️" title="Nenhuma lição" text={role === 'parent' ? 'Adicione a próxima tarefa da escola.' : 'Nenhuma lição esperando por você.'} />
@@ -445,84 +579,6 @@ export function HomeworkScreen() {
         </FormModal>
       ) : null}
       {removing ? <ConfirmRemove title={removing.title} onClose={() => setRemoveId(null)} onConfirm={() => { removeHomework(removing.id); setRemoveId(null) }} /> : null}
-    </div>
-  )
-}
-
-export function AlarmScreen() {
-  const { state, role, saveAlarm, removeAlarm } = useRoutine()
-  const [now, setNow] = useState(() => new Date())
-  const [draft, setDraft] = useState<AlarmItem | null>(null)
-  const [error, setError] = useState('')
-  const [removeId, setRemoveId] = useState<string | null>(null)
-  const removing = state.alarms.find((item) => item.id === removeId)
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000)
-    return () => window.clearInterval(timer)
-  }, [])
-
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
-    if (!draft?.label.trim() || !draft.time || draft.days.length === 0) {
-      setError('Dê um nome, um horário e pelo menos um dia.')
-      return
-    }
-    saveAlarm({ ...draft, label: draft.label.trim() })
-    void askNotificationPermission()
-    setDraft(null)
-  }
-
-  return (
-    <div>
-      <PageHeader
-        title="Despertador"
-        text="Deixe o cantinho aberto no tablet. Na hora, ele toca e mostra um aviso."
-        action={role === 'parent' ? <AddButton label="Novo horário" onClick={() => { setError(''); setDraft({ id: uid(), label: '', emoji: '⏰', time: '07:00', days: ALL_DAYS, enabled: true }) }} /> : null}
-      />
-      <section className="card mb-4 px-6 py-6 text-center">
-        <p className="font-display text-6xl">{now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-        <p className="mt-1 text-sm font-bold text-[var(--soft)]">Hora deste tablet</p>
-        <button type="button" className="btn-soft mt-4" onClick={() => void askNotificationPermission()}>
-          Ativar avisos neste tablet
-        </button>
-      </section>
-      {state.alarms.length === 0 ? (
-        <EmptyState emoji="⏰" title="Nenhum despertador" text={role === 'parent' ? 'Crie o horário de acordar, da escola ou de dormir.' : 'A mamãe ainda vai colocar os horários.'} />
-      ) : (
-        <div className="grid gap-3">
-          {state.alarms.map((alarm) => (
-            <ItemCard
-              key={alarm.id}
-              emoji={alarm.emoji}
-              title={alarm.label}
-              meta={`${alarm.time} · ${daysLabel(alarm.days)}${alarm.enabled ? '' : ' · pausado'}`}
-              onEdit={role === 'parent' ? () => { setError(''); setDraft(alarm) } : undefined}
-              onDelete={role === 'parent' ? () => setRemoveId(alarm.id) : undefined}
-              extra={role === 'parent' ? (
-                <button type="button" className="mt-2 text-sm font-extrabold text-fuchsia-500" onClick={() => saveAlarm({ ...alarm, enabled: !alarm.enabled })}>
-                  {alarm.enabled ? 'Pausar' : 'Ativar'}
-                </button>
-              ) : null}
-            />
-          ))}
-        </div>
-      )}
-      {draft ? (
-        <FormModal title={state.alarms.some((item) => item.id === draft.id) ? 'Editar despertador' : 'Novo despertador'} onClose={() => setDraft(null)} onSubmit={submit}>
-          <EmojiField value={draft.emoji} onChange={(emoji) => setDraft({ ...draft, emoji })} />
-          <Field label="Nome">
-            <TextInput value={draft.label} maxLength={60} placeholder="Acordar" onChange={(event) => setDraft({ ...draft, label: event.target.value })} />
-          </Field>
-          <Field label="Horário">
-            <TextInput type="time" value={draft.time} onChange={(event) => setDraft({ ...draft, time: event.target.value })} />
-          </Field>
-          <DayField value={draft.days} onChange={(days) => setDraft({ ...draft, days })} />
-          <ToggleRow label="Despertador ligado" checked={draft.enabled} onChange={(enabled) => setDraft({ ...draft, enabled })} />
-          {error ? <p className="text-sm font-bold text-rose-500">{error}</p> : null}
-        </FormModal>
-      ) : null}
-      {removing ? <ConfirmRemove title={removing.label} onClose={() => setRemoveId(null)} onConfirm={() => { removeAlarm(removing.id); setRemoveId(null) }} /> : null}
     </div>
   )
 }
@@ -567,7 +623,7 @@ export function ActivityScreen() {
       <PageHeader
         title="Atividades"
         text={role === 'parent' ? 'Diária ou semanal. No horário, o tablet avisa. O Pix, se existir, só você marca.' : 'Marque como feito quando terminar.'}
-        action={role === 'parent' ? <AddButton label="Nova atividade" onClick={() => { setError(''); setDraft({ id: uid(), title: '', emoji: '⭐', note: '', frequency: 'daily', days: SCHOOL_DAYS, time: '16:00', notify: true, pixEnabled: false, pixAmount: 5, pixNote: '' }) }} /> : null}
+        action={<div className="flex flex-wrap gap-2">{role === 'parent' ? <AddButton label="Nova atividade" onClick={() => { setError(''); setDraft({ id: uid(), title: '', emoji: '⭐', note: '', frequency: 'daily', days: SCHOOL_DAYS, time: '16:00', notify: true, pixEnabled: false, pixAmount: 5, pixNote: '' }) }} /> : null}<CreateAlarmButton kind="activity" /></div>}
       />
       {visible.length === 0 ? (
         <EmptyState emoji="⭐" title="Nenhuma atividade" text={role === 'parent' ? 'Crie a primeira atividade do dia ou da semana.' : 'Hoje não tem atividade.'} />
@@ -673,7 +729,7 @@ export function MealScreen() {
       <PageHeader
         title="Refeições"
         text={role === 'parent' ? 'Cadastre o que ela come ao longo do dia.' : 'Marque quando terminar de comer.'}
-        action={role === 'parent' ? <AddButton label="Nova refeição" onClick={() => { setError(''); setDraft({ id: uid(), title: '', emoji: '🍎', time: '12:00', note: '', days: ALL_DAYS }) }} /> : null}
+        action={<div className="flex flex-wrap gap-2">{role === 'parent' ? <AddButton label="Nova refeição" onClick={() => { setError(''); setDraft({ id: uid(), title: '', emoji: '🍎', time: '12:00', note: '', days: ALL_DAYS }) }} /> : null}<CreateAlarmButton kind="meal" /></div>}
       />
       {visible.length === 0 ? (
         <EmptyState
