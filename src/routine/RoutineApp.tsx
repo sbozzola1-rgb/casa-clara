@@ -8,9 +8,13 @@ import { ActivityScreen, ActivityTimer, GradeScreen, HomeworkScreen, MealScreen,
 import { askNotificationPermission } from './sound.ts'
 import { RoutineProvider, useRoutine } from './store.tsx'
 import { Field, Modal, PinPad, TextInput } from './ui.tsx'
-import { cloudReady } from '../lib/cloud.ts'
 
 type Gate = 'enter' | 'create' | 'confirm' | 'word' | 'forgot'
+const PASS_OK = 'casa-clara.rotina.passok'
+
+function samePass(a: string, b: string) {
+  return a.trim().toLocaleLowerCase('pt-BR') === b.trim().toLocaleLowerCase('pt-BR')
+}
 
 export default function RoutineApp() {
   return (
@@ -21,10 +25,11 @@ export default function RoutineApp() {
 }
 
 function Shell() {
-  const { state, role, tab, setTab, today, toast, leaveParent, notify, cloudChecked, linked, houseMessage } = useRoutine()
+  const { state, role, tab, setTab, today, toast, leaveParent, notify, houseMessage, cloudChecked } = useRoutine()
   const [gate, setGate] = useState<Gate | null>(null)
   const [settings, setSettings] = useState(false)
   const [skippedHandoff, setSkippedHandoff] = useState(false)
+  const [passed, setPassed] = useState(() => sessionStorage.getItem(PASS_OK) === '1')
   const profile = state.profile
 
   useEffect(() => {
@@ -59,6 +64,10 @@ function Shell() {
   }
 
   if (!profile) return <Onboarding />
+
+  if (profile.pass && !passed) {
+    return <PassGate name={profile.name} look={profile.avatar} pass={profile.pass} onOk={() => { sessionStorage.setItem(PASS_OK, '1'); setPassed(true) }} />
+  }
 
   if (!profile.pin && !skippedHandoff) {
     return (
@@ -138,12 +147,6 @@ function Shell() {
             <div className="mb-4 rounded-[1.75rem] bg-white/85 px-6 py-4">
               <p className="font-extrabold">{houseMessage}</p>
             </div>
-          ) : null}
-          {cloudReady && cloudChecked && !linked ? (
-            <section className="card mb-4 px-6 py-6">
-              <h2 className="font-display text-3xl">Entrar nesta tela</h2>
-              <RoutineLogin purpose="save" />
-            </section>
           ) : null}
           {tab === 'hoje' ? <TodayScreen /> : null}
           {tab === 'escola' ? <SchoolScreen /> : null}
@@ -239,6 +242,7 @@ function Onboarding() {
   const { saveProfile } = useRoutine()
   const [name, setName] = useState('')
   const [look, setLook] = useState<AvatarLook>(defaultAvatar)
+  const [pass, setPass] = useState('')
 
   return (
     <div className="routine-root relative min-h-screen">
@@ -249,12 +253,6 @@ function Onboarding() {
           <p className="font-display mt-2 text-4xl">{name.trim() || 'Oi!'}</p>
         </div>
         <div className="grid gap-4">
-          {cloudReady ? (
-            <section className="card px-6 py-6">
-              <h1 className="font-display text-4xl">Entrar na rotina da Laura</h1>
-              <RoutineLogin purpose="open" />
-            </section>
-          ) : null}
           <section className="card px-6 py-6 md:px-8 md:py-8">
             <h1 className="font-display text-4xl">Vamos criar o seu cantinho</h1>
             <p className="mt-2 text-[var(--soft)]">Escreva seu nome e monte o bonequinho do jeitinho que você é.</p>
@@ -262,14 +260,21 @@ function Onboarding() {
               Seu nome
               <input className="field-input" maxLength={24} value={name} placeholder="Seu nome" onChange={(event) => setName(event.target.value)} />
             </label>
+            <label className="mt-4 grid gap-1.5 font-extrabold">
+              Senha dela
+              <input className="field-input" type="password" maxLength={32} value={pass} placeholder="A senha que ela vai digitar" onChange={(event) => setPass(event.target.value)} />
+            </label>
             <div className="mt-5">
               <AvatarStudio look={look} onChange={setLook} />
             </div>
             <button
               type="button"
               className="btn-primary mt-6 w-full"
-              disabled={name.trim().length === 0}
-              onClick={() => saveProfile({ name: name.trim(), avatar: look, pin: '', recovery: '' })}
+            disabled={name.trim().length === 0 || pass.trim().length < 4}
+            onClick={() => {
+              sessionStorage.setItem(PASS_OK, '1')
+              saveProfile({ name: name.trim(), avatar: look, pin: '', recovery: '', pass: pass.trim() })
+            }}
             >
               É assim que eu sou!
             </button>
@@ -280,43 +285,36 @@ function Onboarding() {
   )
 }
 
-function RoutineLogin({ purpose }: { purpose: 'save' | 'open' }) {
-  const { linkHouse, notify } = useRoutine()
+function PassGate({ name, look, pass, onOk }: { name: string; look: AvatarLook; pass: string; onOk: () => void }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
 
-  const submit = async (event: FormEvent) => {
+  const submit = (event: FormEvent) => {
     event.preventDefault()
-    setBusy(true)
-    setError('')
-    try {
-      const result = await linkHouse(password)
-      if (result === 'empty') {
-        setError('A Laura ainda está no outro aparelho. Nessa mesma tela da rotina, digita a senha da mamãe e toca em Entrar.')
-        return
-      }
-      if (result === 'opened') notify('Rotina da Laura aberta nesta tela.')
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Não consegui entrar.')
-    } finally {
-      setBusy(false)
+    if (!samePass(password, pass)) {
+      setError('Senha incorreta.')
+      setPassword('')
+      return
     }
+    onOk()
   }
 
   return (
-    <form onSubmit={(event) => void submit(event)} className="mt-4 grid gap-4">
-      <p className="text-[var(--soft)]">
-        {purpose === 'save'
-          ? 'A rotina está só neste aparelho. Digita a senha da mamãe aqui. A Laura continua nesta tela.'
-          : 'Digita a senha da mamãe aqui nesta tela. A rotina da Laura abre aqui.'}
-      </p>
-      <Field label="Senha da mamãe">
-        <TextInput type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} />
-      </Field>
-      {error ? <p className="text-sm font-bold text-rose-500">{error}</p> : null}
-      <button type="submit" className="btn-primary" disabled={busy || password.length === 0}>Entrar</button>
-    </form>
+    <div className="routine-root grid min-h-screen place-items-center px-6">
+      <Sky />
+      <section className="card relative z-10 w-full max-w-md px-6 py-8 text-center">
+        <Avatar look={look} size={140} className="avatar-bob mx-auto" />
+        <h1 className="font-display mt-2 text-4xl">Oi, {name}!</h1>
+        <p className="mt-2 text-[var(--soft)]">Digita a sua senha para abrir a rotina.</p>
+        <form onSubmit={submit} className="mt-5 grid gap-4 text-left">
+          <Field label="Sua senha">
+            <TextInput type="password" autoComplete="current-password" autoFocus value={password} onChange={(event) => { setPassword(event.target.value); setError('') }} />
+          </Field>
+          {error ? <p className="text-sm font-bold text-rose-500">{error}</p> : null}
+          <button type="submit" className="btn-primary w-full" disabled={password.trim().length === 0}>Entrar</button>
+        </form>
+      </section>
+    </div>
   )
 }
 
@@ -429,6 +427,7 @@ function Settings({ onClose, onChangePin }: { onClose: () => void; onChangePin: 
   const profile = state.profile
   const fileRef = useRef<HTMLInputElement>(null)
   const [name, setName] = useState(profile?.name ?? '')
+  const [pass, setPass] = useState(profile?.pass ?? '')
   const [look, setLook] = useState<AvatarLook>(profile?.avatar ?? defaultAvatar())
   const [pinned, setPinned] = useState(routinePinned)
 
@@ -439,7 +438,12 @@ function Settings({ onClose, onChangePin }: { onClose: () => void; onChangePin: 
       notify('Escreva o nome dela')
       return
     }
-    saveProfile({ ...profile, name: name.trim(), avatar: look })
+    if (pass.trim().length < 4) {
+      notify('A senha dela precisa de pelo menos 4 letras')
+      return
+    }
+    saveProfile({ ...profile, name: name.trim(), avatar: look, pass: pass.trim() })
+    sessionStorage.setItem(PASS_OK, '1')
     notify('Cantinho atualizado')
   }
 
@@ -477,6 +481,10 @@ function Settings({ onClose, onChangePin }: { onClose: () => void; onChangePin: 
         <Field label="Nome">
           <TextInput value={name} maxLength={24} onChange={(event) => setName(event.target.value)} />
         </Field>
+        <Field label="Senha dela">
+          <TextInput type="password" maxLength={32} autoComplete="new-password" value={pass} onChange={(event) => setPass(event.target.value)} />
+        </Field>
+        <p className="-mt-2 text-sm font-bold text-[var(--soft)]">É a senha que ela digita para abrir a rotina. Não é a sua.</p>
         <AvatarStudio look={look} onChange={setLook} />
         <button type="button" className="btn-ghost" onClick={onChangePin}>
           Trocar o PIN

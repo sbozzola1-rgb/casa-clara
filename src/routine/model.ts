@@ -15,6 +15,7 @@ export type Profile = {
   avatar: AvatarLook
   pin: string
   recovery: string
+  pass: string
 }
 
 export type SchoolWeek = 'all' | 'swim' | 'robot'
@@ -468,7 +469,7 @@ export function sanitize(input: unknown): RoutineState {
     const raw = source.profile as Record<string, unknown>
     const name = text(raw.name).trim().slice(0, 24)
     const pin = text(raw.pin).replace(/\D/g, '').slice(0, 4)
-    if (name) profile = { name, avatar: avatar(raw.avatar), pin: pin.length === 4 ? pin : '', recovery: text(raw.recovery).trim().toLocaleLowerCase('pt-BR').slice(0, 24) }
+    if (name) profile = { name, avatar: avatar(raw.avatar), pin: pin.length === 4 ? pin : '', recovery: text(raw.recovery).trim().toLocaleLowerCase('pt-BR').slice(0, 24), pass: text(raw.pass).trim().slice(0, 32) }
   }
 
   const seededMaterials = new Map(lauraSchool().map((item) => [item.id, item.materials]))
