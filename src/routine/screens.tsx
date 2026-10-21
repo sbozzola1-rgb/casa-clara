@@ -5,6 +5,7 @@ import {
   dateKey,
   daysLabel,
   doneKey,
+  formatLong,
   formatShort,
   frequencyLabel,
   homeworkKey,
@@ -14,7 +15,9 @@ import {
   occursOn,
   pixKey,
   recentDates,
+  schoolDaysOfWeek,
   schoolOccurs,
+  shiftSchoolWeek,
   weekLabel,
   SCHOOL_DAYS,
   SUBJECTS,
@@ -108,7 +111,7 @@ export function TodayScreen() {
         <h1 className="font-display mt-1 text-4xl md:text-5xl">Oi, {profile?.name}!</h1>
         <p className="mt-2 max-w-lg text-lg text-[var(--soft)]">
           {tasks.length === 0
-            ? 'Quando a rotina estiver pronta, suas estrelinhas aparecem aqui.'
+            ? 'As atividades e as refeições aparecem aqui. A escola fica no calendário.'
             : done === tasks.length
               ? 'Você completou tudo de hoje. Que dia lindo!'
               : 'Marque cada coisinha quando terminar.'}
@@ -132,7 +135,7 @@ export function TodayScreen() {
       ) : null}
 
       {tasks.length === 0 ? (
-        <EmptyState emoji="🌸" title="Hoje está livre" text={role === 'parent' ? 'Cadastre a escola, as atividades e as refeições.' : 'A mamãe ainda vai montar o seu dia.'} />
+        <EmptyState emoji="🌸" title="Hoje está livre" text={role === 'parent' ? 'Cadastre as atividades e as refeições. A escola fica no calendário.' : 'A mamãe ainda vai montar o seu dia.'} />
       ) : (
         <div className="grid gap-3">
           {tasks.map((task) => (
@@ -140,7 +143,7 @@ export function TodayScreen() {
               key={`${task.kind}-${task.id}`}
               emoji={task.emoji}
               title={task.title}
-              meta={[task.time, task.kind === 'school' ? 'Escola' : task.kind === 'meal' ? 'Refeição' : 'Atividade', task.pix ? 'Tem Pix' : ''].filter(Boolean).join(' · ')}
+              meta={[task.time, task.kind === 'meal' ? 'Refeição' : 'Atividade', task.pix ? 'Tem Pix' : ''].filter(Boolean).join(' · ')}
               done={task.done}
               canToggle
               onToggle={() => check(task.kind, task.id, task.done)}
@@ -172,19 +175,20 @@ export function TodayScreen() {
 
 export function SchoolScreen() {
   const { state, role, today, saveSchool, removeSchool } = useRoutine()
-  const check = useCheck()
   const [draft, setDraft] = useState<SchoolItem | null>(null)
   const [error, setError] = useState('')
   const [removeId, setRemoveId] = useState<string | null>(null)
-  const day = dateKey(today)
-  const visible = (role === 'parent' ? state.school : state.school.filter((item) => schoolOccurs(item, today))).slice().sort((a, b) => {
-    if (role === 'parent') {
-      const day = (a.days[0] ?? 0) - (b.days[0] ?? 0)
-      if (day) return day
-    }
-    return a.start.localeCompare(b.start)
+  const [selected, setSelected] = useState(() => {
+    const weekday = today.getDay()
+    if (weekday >= 1 && weekday <= 5) return new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    return schoolDaysOfWeek(today)[0]
   })
+  const week = schoolDaysOfWeek(selected)
+  const lessons = state.school.filter((item) => schoolOccurs(item, selected)).slice().sort((a, b) => a.start.localeCompare(b.start))
+  const materials = lessons.filter((item) => item.materials.trim())
   const removing = state.school.find((item) => item.id === removeId)
+  const earlier = shiftSchoolWeek(selected, -1)
+  const later = shiftSchoolWeek(selected, 1)
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -196,7 +200,7 @@ export function SchoolScreen() {
       setError('Escolha o horário.')
       return
     }
-    saveSchool({ ...draft, title: draft.title.trim(), days: draft.days.length ? draft.days : SCHOOL_DAYS })
+    saveSchool({ ...draft, title: draft.title.trim(), materials: draft.materials.trim(), days: draft.days.length ? draft.days : SCHOOL_DAYS })
     setDraft(null)
   }
 
@@ -204,32 +208,69 @@ export function SchoolScreen() {
     <div>
       <PageHeader
         title="Rotina da escola"
-        text={role === 'parent' ? `Horário da Laura até 15 de dezembro. ${isSwimWeek(today) ? 'Esta semana tem natação.' : 'Esta semana tem robótica.'}` : 'Marque o que você já fez na escola.'}
-        action={role === 'parent' ? <AddButton label="Nova aula" onClick={() => { setError(''); setDraft({ id: uid(), title: '', emoji: '🎒', start: '07:30', end: '', days: SCHOOL_DAYS, week: 'all', until: '' }) }} /> : null}
+        text={role === 'parent' ? 'Calendário até 15 de dezembro. Ela acompanha a semana e o material, sem marcar como feito.' : 'Acompanhe a semana e confira o material do dia.'}
+        action={role === 'parent' ? <AddButton label="Nova aula" onClick={() => { setError(''); setDraft({ id: uid(), title: '', emoji: '🎒', start: '07:30', end: '', days: [selected.getDay()], week: 'all', until: '', materials: '' }) }} /> : null}
       />
-      {visible.length === 0 ? (
-        <EmptyState emoji="🎒" title="Sem aula por aqui" text={role === 'parent' ? 'Adicione a primeira aula da rotina.' : 'Hoje não tem rotina de escola.'} />
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <button type="button" aria-label="Semana anterior" className="btn-ghost grid h-11 w-11 place-items-center text-2xl" disabled={dateKey(earlier) === dateKey(selected)} onClick={() => setSelected(earlier)}>
+          ‹
+        </button>
+        <p className="text-center text-sm font-extrabold text-[var(--soft)]">{isSwimWeek(selected) ? 'Semana da natação' : 'Semana da robótica'}</p>
+        <button type="button" aria-label="Próxima semana" className="btn-ghost grid h-11 w-11 place-items-center text-2xl" disabled={dateKey(later) === dateKey(selected)} onClick={() => setSelected(later)}>
+          ›
+        </button>
+      </div>
+      <div className="mb-5 grid grid-cols-5 gap-2">
+        {week.map((date) => {
+          const key = dateKey(date)
+          const active = key === dateKey(selected)
+          return (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={active}
+              onClick={() => setSelected(date)}
+              className={`rounded-2xl px-1 py-3 text-center ${active ? 'bg-white shadow-md' : 'bg-white/55'}`}
+            >
+              <span className="block text-xs font-extrabold tracking-wide text-[var(--soft)] uppercase">{['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][date.getDay()]}</span>
+              <span className="font-display block text-2xl">{date.getDate()}</span>
+            </button>
+          )
+        })}
+      </div>
+      <section className="card mb-5 px-6 py-5">
+        <p className="text-sm font-extrabold tracking-wide text-[var(--soft)] uppercase">Material do dia</p>
+        <h2 className="font-display mt-1 text-3xl">{formatLong(selected)}</h2>
+        {materials.length === 0 ? (
+          <p className="mt-3 text-[var(--soft)]">{role === 'parent' ? 'Escreva em cada aula o que vai na mochila.' : 'Nada extra para levar neste dia.'}</p>
+        ) : (
+          <ul className="mt-4 grid gap-3">
+            {materials.map((item) => (
+              <li key={item.id} className="flex items-start gap-3">
+                <span className="text-2xl">{item.emoji}</span>
+                <span>
+                  <span className="block font-extrabold">{item.title}</span>
+                  <span className="text-[var(--soft)]">{item.materials}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      {lessons.length === 0 ? (
+        <EmptyState emoji="🎒" title="Sem aula neste dia" text={role === 'parent' ? 'Adicione a aula deste dia.' : 'Este dia não tem rotina de escola.'} />
       ) : (
         <div className="grid gap-3">
-          {visible.map((item) => {
-            const done = Boolean(state.done[doneKey('school', item.id, day)])
-            const happens = schoolOccurs(item, today)
-            if (role !== 'parent' && !happens) return null
-            const when = [item.end ? `${item.start} – ${item.end}` : item.start, daysLabel(item.days), weekLabel(item.week)].filter(Boolean).join(' · ')
-            return (
-              <ItemCard
-                key={item.id}
-                emoji={item.emoji}
-                title={item.title}
-                meta={when}
-                done={happens ? done : undefined}
-                canToggle={happens}
-                onToggle={() => check('school', item.id, done)}
-                onEdit={role === 'parent' ? () => { setError(''); setDraft(item) } : undefined}
-                onDelete={role === 'parent' ? () => setRemoveId(item.id) : undefined}
-              />
-            )
-          })}
+          {lessons.map((item) => (
+            <ItemCard
+              key={item.id}
+              emoji={item.emoji}
+              title={item.title}
+              meta={[item.end ? `${item.start} – ${item.end}` : item.start, weekLabel(item.week)].filter(Boolean).join(' · ')}
+              onEdit={role === 'parent' ? () => { setError(''); setDraft(item) } : undefined}
+              onDelete={role === 'parent' ? () => setRemoveId(item.id) : undefined}
+            />
+          ))}
         </div>
       )}
       {draft ? (
@@ -237,6 +278,9 @@ export function SchoolScreen() {
           <EmojiField value={draft.emoji} onChange={(emoji) => setDraft({ ...draft, emoji })} />
           <Field label="Nome">
             <TextInput value={draft.title} maxLength={60} onChange={(event) => setDraft({ ...draft, title: event.target.value })} />
+          </Field>
+          <Field label="Material da mochila">
+            <TextInput value={draft.materials} maxLength={120} placeholder="O que ela leva neste dia" onChange={(event) => setDraft({ ...draft, materials: event.target.value })} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Começa">
