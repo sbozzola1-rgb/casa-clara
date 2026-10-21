@@ -17,6 +17,8 @@ export type Profile = {
   recovery: string
 }
 
+export type SchoolWeek = 'all' | 'swim' | 'robot'
+
 export type SchoolItem = {
   id: string
   title: string
@@ -24,6 +26,8 @@ export type SchoolItem = {
   start: string
   end: string
   days: number[]
+  week: SchoolWeek
+  until: string
 }
 
 export type HomeworkItem = {
@@ -157,7 +161,7 @@ export function defaultAvatar(): AvatarLook {
 export function emptyRoutine(): RoutineState {
   return {
     profile: null,
-    school: [],
+    school: lauraSchool(),
     homework: [],
     alarms: [],
     activities: [],
@@ -189,6 +193,63 @@ export function eventKey(kind: 'alarm' | 'activity', id: string, date: string) {
 export function occursOn(days: number[], date: Date) {
   if (days.length === 0) return true
   return days.includes(date.getDay())
+}
+
+const SWIM_MONDAY = new Date(2026, 9, 19)
+
+function mondayOf(date: Date) {
+  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const weekday = day.getDay()
+  day.setDate(day.getDate() + (weekday === 0 ? -6 : 1 - weekday))
+  return day
+}
+
+export function isSwimWeek(date: Date) {
+  const days = Math.round((mondayOf(date).getTime() - SWIM_MONDAY.getTime()) / 86_400_000)
+  return Math.floor(days / 7) % 2 === 0
+}
+
+export function schoolOccurs(item: SchoolItem, date: Date) {
+  if (!occursOn(item.days, date)) return false
+  const key = dateKey(date)
+  if (item.until && key > item.until) return false
+  if (item.week === 'swim') return isSwimWeek(date)
+  if (item.week === 'robot') return !isSwimWeek(date)
+  return true
+}
+
+export function weekLabel(week: SchoolWeek) {
+  if (week === 'swim') return 'Semana da natação'
+  if (week === 'robot') return 'Semana da robótica'
+  return ''
+}
+
+const TERM_END = '2026-12-15'
+
+function lesson(id: string, title: string, emoji: string, start: string, end: string, days: number[], week: SchoolWeek): SchoolItem {
+  return { id, title, emoji, start, end, days, week, until: TERM_END }
+}
+
+export function lauraSchool(): SchoolItem[] {
+  return [
+    lesson('laura-lanche', 'Lanche', '🍎', '14:50', '15:10', SCHOOL_DAYS, 'all'),
+    lesson('laura-seg-parque', 'Parque', '🌳', '16:40', '17:00', [1], 'all'),
+    lesson('laura-seg-ingles', 'Inglês', '💬', '17:10', '18:00', [1], 'all'),
+    lesson('laura-ter-edfisica', 'Educação física', '🏃', '16:20', '17:10', [2], 'all'),
+    lesson('laura-qua-ingles', 'Inglês', '💬', '13:50', '14:40', [3], 'all'),
+    lesson('laura-qua-arte', 'Arte', '🎨', '16:20', '17:10', [3], 'all'),
+    lesson('laura-sex-brinquedo', 'Dia do brinquedo', '🧸', '17:10', '18:00', [5], 'all'),
+    lesson('laura-ter-natacao', 'Natação', '🏊', '13:00', '13:50', [2], 'swim'),
+    lesson('laura-qua-linguagens', 'Avaliação de linguagens', '📝', '13:00', '13:50', [3], 'swim'),
+    lesson('laura-qui-brincar', 'Brincar', '🎈', '13:50', '14:40', [4], 'swim'),
+    lesson('laura-sex-lab', 'Laboratório de ciências', '🔬', '13:50', '14:40', [5], 'swim'),
+    lesson('laura-sex-parque', 'Parque', '🌳', '16:40', '17:00', [5], 'swim'),
+    lesson('laura-ter-robotica', 'Robótica', '🤖', '13:00', '14:40', [2], 'robot'),
+    lesson('laura-qua-ciencias', 'Avaliação de ciências', '🧪', '13:00', '13:50', [3], 'robot'),
+    lesson('laura-qui-biblioteca', 'Biblioteca', '📚', '13:50', '14:40', [4], 'robot'),
+    lesson('laura-qui-parque', 'Parque', '🌳', '16:40', '17:00', [4], 'robot'),
+    lesson('laura-sex-karate', 'Karatê / dança', '🥋', '16:20', '17:10', [5], 'robot'),
+  ]
 }
 
 export function activityOccurs(item: ActivityItem, date: Date) {
@@ -241,7 +302,7 @@ export function todayTasks(state: RoutineState, date: Date) {
   const key = dateKey(date)
   const tasks: { kind: 'school' | 'activity' | 'meal'; id: string; emoji: string; title: string; time: string; done: boolean; pix: boolean }[] = []
   for (const item of state.school) {
-    if (!occursOn(item.days, date)) continue
+    if (!schoolOccurs(item, date)) continue
     tasks.push({
       kind: 'school',
       id: item.id,
@@ -374,9 +435,12 @@ export function sanitize(input: unknown): RoutineState {
         if (!item || typeof item !== 'object' || typeof item.id !== 'string') return []
         const title = text(item.title).trim().slice(0, 60)
         if (!title) return []
-        return [{ id: item.id, title, emoji: emoji(item.emoji, '🎒'), start: clock(item.start, '07:30'), end: clock(item.end, ''), days: days(item.days, SCHOOL_DAYS) }]
+        const week = item.week === 'swim' || item.week === 'robot' ? item.week : 'all'
+        const until = /^\d{4}-\d{2}-\d{2}$/.test(text(item.until)) ? text(item.until) : ''
+        return [{ id: item.id, title, emoji: emoji(item.emoji, '🎒'), start: clock(item.start, '07:30'), end: clock(item.end, ''), days: days(item.days, SCHOOL_DAYS), week, until }]
       })
     : []
+  const schoolPlan = school.length ? school : lauraSchool()
 
   const homework = Array.isArray(source.homework)
     ? source.homework.flatMap((item) => {
@@ -441,7 +505,7 @@ export function sanitize(input: unknown): RoutineState {
 
   return {
     profile,
-    school,
+    school: schoolPlan,
     homework,
     alarms,
     activities,

@@ -8,11 +8,14 @@ import {
   formatShort,
   frequencyLabel,
   homeworkKey,
+  isSwimWeek,
   money,
   nextAlarm,
   occursOn,
   pixKey,
   recentDates,
+  schoolOccurs,
+  weekLabel,
   SCHOOL_DAYS,
   SUBJECTS,
   todayTasks,
@@ -174,7 +177,13 @@ export function SchoolScreen() {
   const [error, setError] = useState('')
   const [removeId, setRemoveId] = useState<string | null>(null)
   const day = dateKey(today)
-  const visible = role === 'parent' ? state.school : state.school.filter((item) => occursOn(item.days, today))
+  const visible = (role === 'parent' ? state.school : state.school.filter((item) => schoolOccurs(item, today))).slice().sort((a, b) => {
+    if (role === 'parent') {
+      const day = (a.days[0] ?? 0) - (b.days[0] ?? 0)
+      if (day) return day
+    }
+    return a.start.localeCompare(b.start)
+  })
   const removing = state.school.find((item) => item.id === removeId)
 
   const submit = (event: FormEvent) => {
@@ -195,8 +204,8 @@ export function SchoolScreen() {
     <div>
       <PageHeader
         title="Rotina da escola"
-        text={role === 'parent' ? 'Monte os horários da aula. Ela marca cada um como feito.' : 'Marque o que você já fez na escola.'}
-        action={role === 'parent' ? <AddButton label="Nova aula" onClick={() => { setError(''); setDraft({ id: uid(), title: '', emoji: '🎒', start: '07:30', end: '', days: SCHOOL_DAYS }) }} /> : null}
+        text={role === 'parent' ? `Horário da Laura até 15 de dezembro. ${isSwimWeek(today) ? 'Esta semana tem natação.' : 'Esta semana tem robótica.'}` : 'Marque o que você já fez na escola.'}
+        action={role === 'parent' ? <AddButton label="Nova aula" onClick={() => { setError(''); setDraft({ id: uid(), title: '', emoji: '🎒', start: '07:30', end: '', days: SCHOOL_DAYS, week: 'all', until: '' }) }} /> : null}
       />
       {visible.length === 0 ? (
         <EmptyState emoji="🎒" title="Sem aula por aqui" text={role === 'parent' ? 'Adicione a primeira aula da rotina.' : 'Hoje não tem rotina de escola.'} />
@@ -204,16 +213,17 @@ export function SchoolScreen() {
         <div className="grid gap-3">
           {visible.map((item) => {
             const done = Boolean(state.done[doneKey('school', item.id, day)])
-            const show = role === 'parent' || occursOn(item.days, today)
-            if (!show) return null
+            const happens = schoolOccurs(item, today)
+            if (role !== 'parent' && !happens) return null
+            const when = [item.end ? `${item.start} – ${item.end}` : item.start, daysLabel(item.days), weekLabel(item.week)].filter(Boolean).join(' · ')
             return (
               <ItemCard
                 key={item.id}
                 emoji={item.emoji}
                 title={item.title}
-                meta={`${item.end ? `${item.start} – ${item.end}` : item.start} · ${daysLabel(item.days)}`}
-                done={occursOn(item.days, today) ? done : undefined}
-                canToggle={occursOn(item.days, today)}
+                meta={when}
+                done={happens ? done : undefined}
+                canToggle={happens}
                 onToggle={() => check('school', item.id, done)}
                 onEdit={role === 'parent' ? () => { setError(''); setDraft(item) } : undefined}
                 onDelete={role === 'parent' ? () => setRemoveId(item.id) : undefined}
