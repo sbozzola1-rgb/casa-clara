@@ -296,8 +296,19 @@ export function TodayScreen() {
     time: item.due === day ? 'Para hoje' : 'Atrasada',
     done: Boolean(state.done[homeworkKey(item.id)]),
     pix: false,
+    later: false,
   }))
-  const all = [...tasks, ...homeworkCards]
+  const laterActivities = state.activities.filter((item) => !activityOccurs(item, today)).map((item) => ({
+    kind: 'activity' as const,
+    id: item.id,
+    emoji: item.emoji,
+    title: item.title,
+    time: `${item.time} · ${frequencyLabel(item)}`,
+    done: false,
+    pix: item.pixEnabled,
+    later: true,
+  }))
+  const all = [...tasks.map((task) => ({ ...task, later: false })), ...homeworkCards, ...laterActivities]
   const pending = all.filter((item) => !item.done)
   const finished = all.filter((item) => item.done)
   const routine = state.school.filter((item) => schoolOccurs(item, today)).sort((a, b) => a.start.localeCompare(b.start))
@@ -314,7 +325,7 @@ export function TodayScreen() {
         title={task.title}
         meta={[task.time, task.kind === 'meal' ? 'Refeição' : task.kind === 'homework' ? 'Lição' : 'Atividade', task.pix ? 'Tem Pix' : '', activity && activity.timerMinutes > 0 ? `${activity.timerMinutes} min` : ''].filter(Boolean).join(' · ')}
         done={task.done}
-        canToggle
+        canToggle={!task.later}
         onToggle={() => check(task.kind, task.id, task.done)}
         extra={activity ? <TimerPlay item={activity} /> : null}
       />
@@ -690,7 +701,7 @@ export function ActivityScreen() {
   const [error, setError] = useState('')
   const [removeId, setRemoveId] = useState<string | null>(null)
   const day = dateKey(today)
-  const visible = role === 'parent' ? state.activities : state.activities.filter((item) => activityOccurs(item, today))
+  const visible = [...state.activities].sort((a, b) => Number(activityOccurs(b, today)) - Number(activityOccurs(a, today)) || a.time.localeCompare(b.time))
   const removing = state.activities.find((item) => item.id === removeId)
 
   const submit = (event: FormEvent) => {
@@ -723,11 +734,11 @@ export function ActivityScreen() {
     <div>
       <PageHeader
         title="Atividades"
-        text={role === 'parent' ? 'Diária ou semanal. No horário, o tablet avisa. O Pix, se existir, só você marca.' : 'Marque como feito quando terminar.'}
+        text={role === 'parent' ? 'Diária ou semanal. No horário, o tablet avisa. O Pix, se existir, só você marca.' : 'Estas são as atividades que a mamãe colocou. As de hoje dá para marcar como feito.'}
         action={<div className="flex flex-wrap gap-2">{role === 'parent' ? <AddButton label="Nova atividade" onClick={() => { setError(''); setDraft({ id: uid(), title: '', emoji: '⭐', note: '', frequency: 'daily', days: SCHOOL_DAYS, time: '16:00', notify: true, timerMinutes: 0, pixEnabled: false, pixAmount: 5, pixNote: '' }) }} /> : null}<CreateAlarmButton kind="activity" /></div>}
       />
       {visible.length === 0 ? (
-        <EmptyState emoji="⭐" title="Nenhuma atividade" text={role === 'parent' ? 'Crie a primeira atividade do dia ou da semana.' : 'Hoje não tem atividade.'} />
+        <EmptyState emoji="⭐" title="Nenhuma atividade" text={role === 'parent' ? 'Crie a primeira atividade do dia ou da semana.' : 'A mamãe ainda não colocou atividade.'} />
       ) : (
         <div className="grid gap-3">
           {visible.map((item) => {
