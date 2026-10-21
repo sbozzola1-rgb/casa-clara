@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Avatar, AvatarStudio } from './avatar.tsx'
-import { leaveRoutine, pinRoutine, routinePinned } from './door.ts'
+import { pinRoutine, routinePinned } from './door.ts'
 import { dateKey, defaultAvatar, formatLong, TABS, type AvatarLook } from './model.ts'
 import './routine.css'
 import { RoutineScheduler } from './scheduler.tsx'
@@ -12,19 +12,18 @@ import { cloudReady } from '../lib/cloud.ts'
 
 type Gate = 'enter' | 'create' | 'confirm' | 'word' | 'forgot'
 
-export default function RoutineApp({ onLeave }: { onLeave: () => void }) {
+export default function RoutineApp() {
   return (
     <RoutineProvider>
-      <Shell onLeave={onLeave} />
+      <Shell />
     </RoutineProvider>
   )
 }
 
-function Shell({ onLeave }: { onLeave: () => void }) {
-  const { state, role, tab, setTab, today, toast, leaveParent, notify, cloudChecked, linked } = useRoutine()
+function Shell() {
+  const { state, role, tab, setTab, today, toast, leaveParent, notify, cloudChecked, linked, houseMessage } = useRoutine()
   const [gate, setGate] = useState<Gate | null>(null)
   const [settings, setSettings] = useState(false)
-  const [linkOpen, setLinkOpen] = useState(false)
   const [skippedHandoff, setSkippedHandoff] = useState(false)
   const profile = state.profile
 
@@ -135,12 +134,16 @@ function Shell({ onLeave }: { onLeave: () => void }) {
         </header>
 
         <main className="px-4 pt-2 pb-28 md:px-8 md:pb-12">
-          {cloudReady && cloudChecked && !linked ? (
+          {houseMessage ? (
             <div className="mb-4 rounded-[1.75rem] bg-white/85 px-6 py-4">
-              <p className="font-extrabold">A rotina da Laura está só neste aparelho.</p>
-              <p className="mt-1 text-sm font-bold text-[var(--soft)]">Salva na casa para o tablet dela abrir o mesmo link, sem começar outro cadastro.</p>
-              <button type="button" className="btn-primary mt-3" onClick={() => setLinkOpen(true)}>Salvar na casa</button>
+              <p className="font-extrabold">{houseMessage}</p>
             </div>
+          ) : null}
+          {cloudReady && cloudChecked && !linked ? (
+            <section className="card mb-4 px-6 py-6">
+              <h2 className="font-display text-3xl">Entrar nesta tela</h2>
+              <RoutineLogin purpose="save" />
+            </section>
           ) : null}
           {tab === 'hoje' ? <TodayScreen /> : null}
           {tab === 'escola' ? <SchoolScreen /> : null}
@@ -180,17 +183,12 @@ function Shell({ onLeave }: { onLeave: () => void }) {
           }}
         />
       ) : null}
-      {linkOpen ? <HouseLink purpose="save" onClose={() => setLinkOpen(false)} /> : null}
       {settings ? (
         <Settings
           onClose={() => setSettings(false)}
           onChangePin={() => {
             setSettings(false)
             setGate('create')
-          }}
-          onLeave={() => {
-            leaveRoutine()
-            onLeave()
           }}
         />
       ) : null}
@@ -241,7 +239,6 @@ function Onboarding() {
   const { saveProfile } = useRoutine()
   const [name, setName] = useState('')
   const [look, setLook] = useState<AvatarLook>(defaultAvatar)
-  const [openHouse, setOpenHouse] = useState(false)
 
   return (
     <div className="routine-root relative min-h-screen">
@@ -254,9 +251,8 @@ function Onboarding() {
         <div className="grid gap-4">
           {cloudReady ? (
             <section className="card px-6 py-6">
-              <h1 className="font-display text-4xl">A Laura já existe</h1>
-              <p className="mt-2 text-[var(--soft)]">Se o cantinho foi criado em outro aparelho, entra com a senha da casa. Ela abre aqui, sem um cadastro novo.</p>
-              <button type="button" className="btn-primary mt-5 w-full" onClick={() => setOpenHouse(true)}>Abrir a rotina da Laura</button>
+              <h1 className="font-display text-4xl">Entrar na rotina da Laura</h1>
+              <RoutineLogin purpose="open" />
             </section>
           ) : null}
           <section className="card px-6 py-6 md:px-8 md:py-8">
@@ -280,12 +276,11 @@ function Onboarding() {
           </section>
         </div>
       </div>
-      {openHouse ? <HouseLink purpose="open" onClose={() => setOpenHouse(false)} /> : null}
     </div>
   )
 }
 
-function HouseLink({ purpose, onClose }: { purpose: 'save' | 'open'; onClose: () => void }) {
+function RoutineLogin({ purpose }: { purpose: 'save' | 'open' }) {
   const { linkHouse, notify } = useRoutine()
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -298,37 +293,30 @@ function HouseLink({ purpose, onClose }: { purpose: 'save' | 'open'; onClose: ()
     try {
       const result = await linkHouse(password)
       if (result === 'empty') {
-        setError('Ainda não tem rotina salva na casa. No computador, abre a rotina e toca em Salvar na casa.')
+        setError('A Laura ainda está no outro aparelho. Nessa mesma tela da rotina, digita a senha da mamãe e toca em Entrar.')
         return
       }
-      notify(result === 'saved' ? 'Rotina salva. No tablet dela, abre o mesmo link e entra com a senha da casa.' : 'Rotina da Laura aberta neste aparelho.')
-      onClose()
-    } catch {
-      setError('Senha incorreta.')
+      if (result === 'opened') notify('Rotina da Laura aberta nesta tela.')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Não consegui entrar.')
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <Modal
-      title={purpose === 'save' ? 'Salvar na casa' : 'Abrir a rotina da Laura'}
-      description={purpose === 'save' ? 'A senha da casa guarda a rotina para o tablet dela abrir o mesmo link.' : 'Entra com a senha da casa. A Laura que já foi criada vem para este aparelho.'}
-      onClose={onClose}
-      footer={(
-        <>
-          <button type="button" className="btn-ghost" onClick={onClose}>Agora não</button>
-          <button type="submit" form="house-link" className="btn-primary" disabled={busy || password.length === 0}>Entrar</button>
-        </>
-      )}
-    >
-      <form id="house-link" onSubmit={(event) => void submit(event)} className="grid gap-4">
-        <Field label="Senha da casa">
-          <TextInput type="password" autoComplete="current-password" autoFocus value={password} onChange={(event) => setPassword(event.target.value)} />
-        </Field>
-        {error ? <p className="text-sm font-bold text-rose-500">{error}</p> : null}
-      </form>
-    </Modal>
+    <form onSubmit={(event) => void submit(event)} className="mt-4 grid gap-4">
+      <p className="text-[var(--soft)]">
+        {purpose === 'save'
+          ? 'A rotina está só neste aparelho. Digita a senha da mamãe aqui. A Laura continua nesta tela.'
+          : 'Digita a senha da mamãe aqui nesta tela. A rotina da Laura abre aqui.'}
+      </p>
+      <Field label="Senha da mamãe">
+        <TextInput type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} />
+      </Field>
+      {error ? <p className="text-sm font-bold text-rose-500">{error}</p> : null}
+      <button type="submit" className="btn-primary" disabled={busy || password.length === 0}>Entrar</button>
+    </form>
   )
 }
 
@@ -436,7 +424,7 @@ function PinGate({ mode, onMode, onClose, onReady }: { mode: Gate; onMode: (mode
   )
 }
 
-function Settings({ onClose, onChangePin, onLeave }: { onClose: () => void; onChangePin: () => void; onLeave: () => void }) {
+function Settings({ onClose, onChangePin }: { onClose: () => void; onChangePin: () => void }) {
   const { state, saveProfile, replaceState, notify } = useRoutine()
   const profile = state.profile
   const fileRef = useRef<HTMLInputElement>(null)
@@ -503,7 +491,7 @@ function Settings({ onClose, onChangePin, onLeave }: { onClose: () => void; onCh
             const next = !pinned
             pinRoutine(next)
             setPinned(next)
-            notify(next ? 'Este tablet abre na rotina' : 'Este tablet abre nas finanças')
+            notify(next ? 'Este tablet abre na rotina' : 'A rotina deixa de abrir sozinha neste tablet')
           }}
         >
           {pinned ? 'Este tablet abre direto na rotina' : 'Abrir a rotina sempre neste tablet'}
@@ -516,9 +504,6 @@ function Settings({ onClose, onChangePin, onLeave }: { onClose: () => void; onCh
             Restaurar
           </button>
         </div>
-        <button type="button" className="text-sm font-extrabold text-[var(--soft)]" onClick={onLeave}>
-          Ir para as finanças
-        </button>
         <input
           ref={fileRef}
           type="file"

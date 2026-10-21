@@ -42,15 +42,25 @@ export async function pullHousehold(): Promise<HouseholdRow | null> {
 }
 
 function routinePayload(data: unknown) {
-  if (!data || typeof data !== 'object' || !('__routine' in data)) return undefined
-  return (data as { __routine?: unknown }).__routine
+  if (!data || typeof data !== 'object') return undefined
+  const source = data as { routine?: unknown; __routine?: unknown }
+  return source.routine ?? source.__routine
+}
+
+function readRoutineBlob(payload: unknown): RoutineCloud | null {
+  if (!payload || typeof payload !== 'object') return null
+  const blob = payload as { revision?: unknown; state?: unknown }
+  if (!blob.state || typeof blob.state !== 'object') return null
+  const state = blob.state as { profile?: { name?: unknown } }
+  if (typeof state.profile?.name !== 'string' || state.profile.name.trim().length === 0) return null
+  return { revision: Number(blob.revision) || 0, state: blob.state }
 }
 
 export async function pushHousehold(state: AppState, revision: number) {
   if (!supabase) return
   const current = await pullHousehold()
   const routine = routinePayload(current?.data)
-  const data = routine ? { ...state, __routine: routine } : state
+  const data = routine ? { ...state, routine } : state
   const { error } = await supabase.from('household').upsert({
     id: 'casa',
     data,
@@ -66,25 +76,40 @@ export interface RoutineCloud {
 }
 
 export async function pullRoutine(): Promise<RoutineCloud | null> {
+  if (!supabase) return null
+  const extra = await supabase.from('household').select('data').eq('id', 'rotina').maybeSingle()
+  if (!extra.error) {
+    const saved = readRoutineBlob(routinePayload(extra.data?.data))
+    if (saved) return saved
+  }
   const row = await pullHousehold()
-  const payload = routinePayload(row?.data)
-  if (!payload || typeof payload !== 'object') return null
-  const blob = payload as { revision?: unknown; state?: unknown }
-  if (!blob.state || typeof blob.state !== 'object') return null
-  return { revision: Number(blob.revision) || 0, state: blob.state }
+  return readRoutineBlob(routinePayload(row?.data))
 }
 
 export async function pushRoutine(state: unknown, revision: number) {
-  if (!supabase) return
-  const row = await pullHousehold()
-  if (!row || !row.data || typeof row.data !== 'object') throw new Error('casa')
-  const { error } = await supabase.from('household').upsert({
-    id: 'casa',
-    data: { ...(row.data as Record<string, unknown>), __routine: { revision, state } },
-    revision: row.revision,
-    updated_at: new Date().toISOString(),
+  if (!supabase) throw new Error('A casa ainda não está ligada.')
+  const blob = { revision, state }
+  const stamp = new Date().toISOString()
+  const extra = await supabase.from('household').upsert({
+    id: 'rotina',
+    data: { routine: blob },
+    revision,
+    updated_at: stamp,
   })
-  if (error) throw error
+  const row = await pullHousehold()
+  if (row?.data && typeof row.data === 'object') {
+    const saved = await supabase.from('household').upsert({
+      id: 'casa',
+      data: { ...(row.data as Record<string, unknown>), routine: blob },
+      revision: row.revision,
+      updated_at: stamp,
+    })
+    if (saved.error && extra.error) throw new Error(saved.error.message)
+  } else if (extra.error) {
+    throw new Error(extra.error.message)
+  }
+  const check = await pullRoutine()
+  if (!check) throw new Error('A casa não guardou a rotina. Tenta de novo.')
 }
 
 export function subscribeHousehold(onChange: (row: HouseholdRow) => void) {

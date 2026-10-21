@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { pinRoutine } from './door.ts'
 import { pullRoutine, pushRoutine, signIn, subscribeHousehold, supabase } from '../lib/cloud.ts'
 import {
   dateKey,
@@ -56,6 +57,7 @@ interface RoutineStore {
   closeTimer: () => void
   cloudChecked: boolean
   linked: boolean
+  houseMessage: string | null
   linkHouse: (password: string) => Promise<'saved' | 'opened' | 'empty'>
 }
 
@@ -110,6 +112,7 @@ export function RoutineProvider({ children }: { children: ReactNode }) {
   const [timer, setTimer] = useState<ActivityItem | null>(null)
   const [cloudChecked, setCloudChecked] = useState(false)
   const [linked, setLinked] = useState(false)
+  const [houseMessage, setHouseMessage] = useState<string | null>(null)
   const ignorePush = useRef(true)
   const revision = useRef(readRev())
   const stateRef = useRef(state)
@@ -120,13 +123,25 @@ export function RoutineProvider({ children }: { children: ReactNode }) {
     writeRev(outcome.revision)
     ignorePush.current = true
     if (outcome.state) setState(outcome.state)
+    if (outcome.result === 'saved') setHouseMessage('Pronto. A rotina ficou nesta tela.')
     if (outcome.result !== 'empty') setLinked(true)
     return outcome.result
   }, [])
 
   const linkHouse = useCallback(async (password: string) => {
-    await signIn(password)
-    return applyCloud(await syncRoutine(stateRef.current, revision.current))
+    const hadProfile = Boolean(stateRef.current.profile)
+    try {
+      await signIn(password)
+    } catch {
+      throw new Error('Senha incorreta.')
+    }
+    if (!hadProfile) pinRoutine(true)
+    try {
+      return applyCloud(await syncRoutine(stateRef.current, revision.current))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ''
+      throw new Error(message || 'Não consegui gravar a rotina na casa.')
+    }
   }, [applyCloud])
 
   useEffect(() => {
@@ -144,7 +159,7 @@ export function RoutineProvider({ children }: { children: ReactNode }) {
         if (cancel || outcome.result === 'empty') return
         applyCloud(outcome)
         if (outcome.result === 'saved' && outcome.revision === 1) {
-          setToast('Rotina salva na casa. No tablet dela, abre o mesmo link e entra com a senha da casa.')
+          setToast('Rotina guardada nesta tela.')
         }
       } catch {
         if (!cancel) setToast('Não consegui buscar a rotina da casa.')
@@ -160,8 +175,9 @@ export function RoutineProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!linked) return
     return subscribeHousehold((row) => {
-      const payload = row.data && typeof row.data === 'object' && '__routine' in (row.data as object)
-        ? (row.data as { __routine?: { revision?: unknown; state?: unknown } }).__routine
+      const payload = row.data && typeof row.data === 'object'
+        ? ((row.data as { routine?: { revision?: unknown; state?: unknown }; __routine?: { revision?: unknown; state?: unknown } }).routine
+          ?? (row.data as { __routine?: { revision?: unknown; state?: unknown } }).__routine)
         : undefined
       const nextRev = Number(payload?.revision) || 0
       if (!payload?.state || nextRev <= revision.current) return
@@ -290,13 +306,14 @@ export function RoutineProvider({ children }: { children: ReactNode }) {
     closeTimer: () => setTimer(null),
     cloudChecked,
     linked,
+    houseMessage,
     linkHouse,
     replaceState: (input) => {
       const next = sanitize(input)
       if (!next.profile) throw new Error('arquivo')
       setState(next)
     },
-  }), [cloudChecked, linkHouse, linked, notify, patch, replaceList, role, state, tab, timer, toast, today])
+  }), [cloudChecked, houseMessage, linkHouse, linked, notify, patch, replaceList, role, state, tab, timer, toast, today])
 
   return <RoutineContext.Provider value={value}>{children}</RoutineContext.Provider>
 }
