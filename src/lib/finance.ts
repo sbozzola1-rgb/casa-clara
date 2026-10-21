@@ -1,6 +1,6 @@
 import { addMonthsClamped, dateOn, formatISO, inRange, monthKey, monthName, monthRange, parseDate, parseMonthKey, startOfDay } from './dates.ts'
 import { round2 } from './money.ts'
-import { categoryLabel, methodLabel, type AppState, type BudgetCategory, type CreditCard, type Purchase, type SpendEntry } from './types.ts'
+import { categoryLabel, methodLabel, type AppState, type BudgetCategory, type CompanyEntry, type CreditCard, type Purchase, type SpendEntry } from './types.ts'
 
 export interface Installment {
   index: number
@@ -9,10 +9,14 @@ export interface Installment {
   amount: number
 }
 
+export function companyOnCard(entry: CompanyEntry): boolean {
+  return entry.direction === 'saida' && entry.method === 'cartao' && Boolean(entry.cardId)
+}
+
 export interface InvoiceLine {
   purchaseId: string
   description: string
-  category: Purchase['category']
+  category: string
   date: string
   amount: number
   installment: number
@@ -82,17 +86,31 @@ export function invoiceForCard(
   year: number,
   monthIndex: number,
   paidInvoices: Record<string, true>,
+  companyEntries: CompanyEntry[] = [],
 ): Invoice {
   const lines: InvoiceLine[] = []
-  for (const purchase of purchases) {
+  const sources: Purchase[] = [
+    ...purchases,
+    ...companyEntries.filter((entry) => companyOnCard(entry) && entry.cardId === card.id).map((entry) => ({
+      id: entry.id,
+      cardId: entry.cardId ?? '',
+      description: entry.description,
+      amount: entry.amount,
+      installments: entry.installments,
+      date: entry.date,
+      category: 'outro' as const,
+    })),
+  ]
+  for (const purchase of sources) {
     if (purchase.cardId !== card.id) continue
+    const company = companyEntries.find((entry) => entry.id === purchase.id)
     for (const installment of installmentSchedule(purchase)) {
       const bill = invoiceMonthFor(installment.date, card.closingDay)
       if (bill.year !== year || bill.monthIndex !== monthIndex) continue
       lines.push({
         purchaseId: purchase.id,
         description: purchase.description,
-        category: purchase.category,
+        category: company?.category ?? purchase.category,
         date: formatISO(installment.date),
         amount: installment.amount,
         installment: installment.index,
@@ -121,7 +139,7 @@ export function invoicesDueInMonth(state: AppState, month: string): Invoice[] {
       const ref = new Date(year, monthIndex + shift, 1)
       const due = invoiceDueDate(ref.getFullYear(), ref.getMonth(), card.closingDay, card.dueDay)
       if (due.getFullYear() !== year || due.getMonth() !== monthIndex) continue
-      invoices.push(invoiceForCard(card, state.purchases, ref.getFullYear(), ref.getMonth(), state.paidInvoices))
+      invoices.push(invoiceForCard(card, state.purchases, ref.getFullYear(), ref.getMonth(), state.paidInvoices, state.companyEntries))
     }
   }
   return invoices.sort((a, b) => a.due.getTime() - b.due.getTime())
@@ -132,6 +150,16 @@ export function limitUsed(card: CreditCard, state: AppState, today: Date): numbe
   for (const purchase of state.purchases) {
     if (purchase.cardId !== card.id) continue
     for (const installment of installmentSchedule(purchase)) {
+      const bill = invoiceMonthFor(installment.date, card.closingDay)
+      if (state.paidInvoices[invoiceKey(card.id, bill.year, bill.monthIndex)]) continue
+      const due = invoiceDueDate(bill.year, bill.monthIndex, card.closingDay, card.dueDay)
+      if (startOfDay(due).getTime() < startOfDay(today).getTime()) continue
+      total += installment.amount
+    }
+  }
+  for (const entry of state.companyEntries) {
+    if (!companyOnCard(entry) || entry.cardId !== card.id) continue
+    for (const installment of installmentSchedule({ amount: entry.amount, installments: entry.installments, date: entry.date })) {
       const bill = invoiceMonthFor(installment.date, card.closingDay)
       if (state.paidInvoices[invoiceKey(card.id, bill.year, bill.monthIndex)]) continue
       const due = invoiceDueDate(bill.year, bill.monthIndex, card.closingDay, card.dueDay)
@@ -362,7 +390,12 @@ export function monthFlow(state: AppState, month: string) {
   const company = companyInMonth(state, month)
   const report = monthReport(state, month)
   const income = round2(people.total + company.entradas)
-  const expense = round2(report.outflow + company.saidas)
+  const companyCash = round2(
+    company.entries
+      .filter((entry) => entry.direction === 'saida' && !companyOnCard(entry))
+      .reduce((sum, entry) => sum + entry.amount, 0),
+  )
+  const expense = round2(report.outflow + companyCash)
   return {
     people,
     company,

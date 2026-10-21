@@ -6,6 +6,7 @@ import { formatBRL, formatInput, parseMoney, uid } from '../lib/money.ts'
 import {
   CARD_COLORS,
   COMPANY_CATEGORIES,
+  COMPANY_PAYMENTS,
   FIXED_CATEGORIES,
   FIXED_ICONS,
   iconForCategory,
@@ -15,6 +16,7 @@ import {
   type CashExpense,
   type CompanyDirection,
   type CompanyEntry,
+  type CompanyPayment,
   type CreditCard,
   type FixedExpense,
   type FixedIconId,
@@ -975,12 +977,15 @@ function incomeWhen(source: IncomeSource): string {
 }
 
 export function CompanyDialog({ entry, onClose }: { entry: CompanyEntry | null; onClose: () => void }) {
-  const { upsertCompany, removeCompany } = useStore()
+  const { state, upsertCompany, removeCompany } = useStore()
   const [direction, setDirection] = useState<CompanyDirection>(entry?.direction ?? 'saida')
   const [description, setDescription] = useState(entry?.description ?? '')
   const [amount, setAmount] = useState(entry ? formatInput(entry.amount) : '')
   const [date, setDate] = useState(entry?.date ?? todayISO())
   const [category, setCategory] = useState(entry?.category ?? 'Outro')
+  const [method, setMethod] = useState<CompanyPayment>(entry?.method ?? 'pix')
+  const [cardId, setCardId] = useState(entry?.cardId ?? state.cards[0]?.id ?? '')
+  const [installments, setInstallments] = useState(String(entry?.installments ?? 1))
   const [error, setError] = useState('')
   const [confirming, setConfirming] = useState(false)
 
@@ -998,6 +1003,16 @@ export function CompanyDialog({ entry, onClose }: { entry: CompanyEntry | null; 
       setError('Informe a data.')
       return
     }
+    const payByCard = direction === 'saida' && method === 'cartao'
+    if (payByCard && !cardId) {
+      setError('Cadastre um cartão ou escolha outra forma de pagamento.')
+      return
+    }
+    const count = Math.round(Number(installments))
+    if (payByCard && (!Number.isInteger(count) || count < 1 || count > 24)) {
+      setError('As parcelas vão de 1 a 24.')
+      return
+    }
     upsertCompany({
       id: entry?.id ?? uid(),
       direction,
@@ -1005,6 +1020,9 @@ export function CompanyDialog({ entry, onClose }: { entry: CompanyEntry | null; 
       amount: parsed,
       date,
       category,
+      method,
+      cardId: payByCard ? cardId : null,
+      installments: payByCard ? count : 1,
     })
     onClose()
   }
@@ -1077,6 +1095,35 @@ export function CompanyDialog({ entry, onClose }: { entry: CompanyEntry | null; 
               </select>
             </Field>
           </div>
+          <Field label="Forma de pagamento">
+            <select className={fieldClass} value={method} onChange={(event) => setMethod(event.target.value as CompanyPayment)}>
+              {COMPANY_PAYMENTS.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {direction === 'saida' && method === 'cartao' ? (
+            <p className="text-xs leading-relaxed text-ink-soft">Esse valor entra na fatura do cartão. Na conta da casa ele sai no mês da fatura, uma vez só.</p>
+          ) : null}
+          {direction === 'saida' && method === 'cartao' ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Cartão">
+                <select className={fieldClass} value={cardId} onChange={(event) => setCardId(event.target.value)}>
+                  {state.cards.length === 0 ? <option value="">Nenhum cartão</option> : null}
+                  {state.cards.map((card) => (
+                    <option key={card.id} value={card.id}>
+                      {card.nickname}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Parcelas">
+                <input className={fieldClass} inputMode="numeric" value={installments} onChange={(event) => setInstallments(event.target.value)} />
+              </Field>
+            </div>
+          ) : null}
           {error ? <p className="text-sm text-clay">{error}</p> : null}
         </form>
       </Modal>

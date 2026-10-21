@@ -1,4 +1,4 @@
-import { emptyState, CARD_COLORS, COMPANY_CATEGORIES, FIXED_ICONS, iconForCategory, PAYMENT_METHODS, PEOPLE, SPEND_CATEGORIES, type AppState, type CardColorId, type CompanyDirection, type FixedIconId, type GroceryInflow, type IncomeSource, type PaymentMethod, type Person, type SpendingCategory } from './types.ts'
+import { emptyState, CARD_COLORS, COMPANY_CATEGORIES, COMPANY_PAYMENTS, FIXED_ICONS, iconForCategory, PAYMENT_METHODS, PEOPLE, SPEND_CATEGORIES, type AppState, type CardColorId, type CompanyDirection, type CompanyPayment, type FixedIconId, type GroceryInflow, type IncomeSource, type PaymentMethod, type Person, type SpendingCategory } from './types.ts'
 
 const KEY = 'casa-clara.v1'
 const spendIds = new Set<string>(SPEND_CATEGORIES.map((item) => item.id))
@@ -7,6 +7,7 @@ const colorIds = new Set<string>(CARD_COLORS.map((item) => item.id))
 const personIds = new Set<string>(PEOPLE.map((item) => item.id))
 const fixedIconIds = new Set<string>(FIXED_ICONS.map((item) => item.id))
 const companyCategories = new Set<string>(COMPANY_CATEGORIES)
+const companyPayments = new Set<string>(COMPANY_PAYMENTS.map((item) => item.id))
 
 function numberOrNull(value: unknown): number | null {
   if (value == null || value === '') return null
@@ -83,6 +84,9 @@ export function sanitize(input: unknown): AppState | null {
             const direction = text(item.direction)
             if (amount == null || amount <= 0 || (direction !== 'entrada' && direction !== 'saida')) return []
             const category = text(item.category, 'Outro')
+            const method = text(item.method)
+            const payment = (companyPayments.has(method) ? method : 'pix') as CompanyPayment
+            const cardId = direction === 'saida' && payment === 'cartao' ? text(item.cardId) : ''
             return [
               {
                 id: item.id,
@@ -91,6 +95,9 @@ export function sanitize(input: unknown): AppState | null {
                 amount,
                 date: /^\d{4}-\d{2}-\d{2}$/.test(text(item.date)) ? text(item.date) : '2026-01-01',
                 category: companyCategories.has(category) ? category : 'Outro',
+                method: payment === 'cartao' && direction === 'saida' && cardId.length === 0 ? 'pix' : payment,
+                cardId: cardId.length > 0 ? cardId : null,
+                installments: cardId.length > 0 ? Math.min(24, Math.max(1, Math.round(Number(item.installments)) || 1)) : 1,
               },
             ]
           })

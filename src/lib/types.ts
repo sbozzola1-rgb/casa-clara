@@ -162,6 +162,15 @@ export const COMPANY_CATEGORIES = ['Venda', 'Serviço', 'Pró-labore', 'Forneced
 
 export type CompanyDirection = 'entrada' | 'saida'
 
+export type CompanyPayment = 'pix' | 'debito' | 'dinheiro' | 'cartao'
+
+export const COMPANY_PAYMENTS: { id: CompanyPayment; label: string }[] = [
+  { id: 'pix', label: 'Pix' },
+  { id: 'debito', label: 'Débito' },
+  { id: 'dinheiro', label: 'Dinheiro' },
+  { id: 'cartao', label: 'Cartão de crédito' },
+]
+
 export interface CompanyEntry {
   id: string
   direction: CompanyDirection
@@ -169,6 +178,9 @@ export interface CompanyEntry {
   amount: number
   date: string
   category: string
+  method: CompanyPayment
+  cardId: string | null
+  installments: number
 }
 
 export interface AppState {

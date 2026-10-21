@@ -31,7 +31,7 @@ export function CardsPage() {
           {state.cards.map((card) => {
             const used = limitUsed(card, state, today)
             const open = openInvoiceMonth(today, card.closingDay)
-            const invoice = invoiceForCard(card, state.purchases, open.year, open.monthIndex, state.paidInvoices)
+            const invoice = invoiceForCard(card, state.purchases, open.year, open.monthIndex, state.paidInvoices, state.companyEntries)
             const palette = cardPalette(card.color)
             const ratio = card.limit > 0 ? Math.min(used / card.limit, 1) : 0
             return (
@@ -99,7 +99,7 @@ export function CardDetail({ cardId }: { cardId: string }) {
   }
 
   const { year, monthIndex } = parseMonthKey(billMonth)
-  const invoice = invoiceForCard(card, state.purchases, year, monthIndex, state.paidInvoices)
+  const invoice = invoiceForCard(card, state.purchases, year, monthIndex, state.paidInvoices, state.companyEntries)
   const used = limitUsed(card, state, today)
   const palette = cardPalette(card.color)
   const purchases = state.purchases

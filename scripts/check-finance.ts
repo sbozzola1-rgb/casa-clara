@@ -100,6 +100,26 @@ assert(monthFlow(dated, '2026-10').people.vinicius === 1000 && monthFlow(dated, 
 assert(monthFlow(dated, '2026-11').people.sara === 300 && monthFlow(dated, '2026-11').people.vinicius === 1000, 'extra entra só em novembro e o salário continua')
 assert(october.expense === 2500, 'saída da empresa soma nos gastos da casa')
 
+const companyCard = {
+  ...emptyState(),
+  cards: [card],
+  companyEntries: [
+    {
+      id: 'fornecedor-cartao',
+      direction: 'saida' as const,
+      description: 'Fornecedor',
+      amount: 300,
+      date: '2026-10-20',
+      category: 'Fornecedor',
+      method: 'cartao' as const,
+      cardId: 'card-1',
+      installments: 1,
+    },
+  ],
+}
+assert(monthFlow(companyCard, '2026-10').expense === 0, 'saída no cartão não soma de novo em outubro')
+assert(invoiceForCard(card, [], 2026, 10, {}, companyCard.companyEntries).total === 300, 'saída da empresa entra na fatura de novembro')
+
 const late = overdueItems(household, parseDate('2026-10-20'))
 assert(late.some((item) => item.expenseId === 'aluguel' && item.month === '2026-10'), 'aluguel de outubro vencido entra na gestão')
 assert(late.filter((item) => item.expenseId === 'aluguel').length === 6, 'olha os últimos 6 meses')

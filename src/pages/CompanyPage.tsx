@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { CompanyDialog } from '../components/dialogs.tsx'
 import { Button, EmptyState, FlowChart, PageIntro, Panel } from '../components/ui.tsx'
 import { formatFriendly, monthTitle } from '../lib/dates.ts'
-import { companyInMonth, flowSeries } from '../lib/finance.ts'
+import { companyInMonth, companyOnCard, flowSeries } from '../lib/finance.ts'
 import { formatBRL, round2 } from '../lib/money.ts'
-import type { CompanyEntry } from '../lib/types.ts'
+import { COMPANY_PAYMENTS, type CompanyEntry } from '../lib/types.ts'
 import { useStore } from '../state.tsx'
 
 export function CompanyPage() {
@@ -50,7 +50,7 @@ export function CompanyPage() {
                       <span>
                         <span className="block text-sm font-medium">{entry.description}</span>
                         <span className="block text-xs text-ink-soft">
-                          {formatFriendly(entry.date, today)} · {entry.category} · {entry.direction === 'entrada' ? 'Entrada' : 'Saída'}
+                          {formatFriendly(entry.date, today)} · {entry.category} · {entry.direction === 'entrada' ? 'Entrada' : 'Saída'} · {companyPaymentLabel(entry, state.cards)}
                         </span>
                       </span>
                       <span className={`font-medium tabular-nums ${entry.direction === 'entrada' ? 'text-moss' : 'text-clay'}`}>
@@ -72,6 +72,15 @@ export function CompanyPage() {
       {editing !== null ? <CompanyDialog entry={editing === 'new' ? null : editing} onClose={() => setEditing(null)} /> : null}
     </div>
   )
+}
+
+function companyPaymentLabel(entry: CompanyEntry, cards: { id: string; nickname: string }[]): string {
+  if (companyOnCard(entry)) {
+    const card = cards.find((item) => item.id === entry.cardId)
+    const name = card?.nickname ?? 'Cartão'
+    return entry.installments > 1 ? `${name} · ${entry.installments}x` : name
+  }
+  return COMPANY_PAYMENTS.find((item) => item.id === entry.method)?.label ?? 'Pix'
 }
 
 function Summary({ label, value, tone }: { label: string; value: string; tone: 'good' | 'bad' }) {

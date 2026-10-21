@@ -3,7 +3,7 @@ import { IncomeDialog } from '../components/dialogs.tsx'
 import { ExpenseMark } from '../components/ExpenseIcon.tsx'
 import { BudgetMeter, Button, FlowChart, Panel, ToneBadge, toneLabel } from '../components/ui.tsx'
 import { dateOn, dueTone, formatShort, monthRange, monthTitle, parseMonthKey, startOfWeek, weekTitle } from '../lib/dates.ts'
-import { fixedKey, flowSeries, fuelGoal, groceryGoal, invoiceForCard, invoicesDueInMonth, limitUsed, monthFlow, openInvoiceMonth, overdueItems, spentInRange, variableSpending } from '../lib/finance.ts'
+import { companyOnCard, fixedKey, flowSeries, fuelGoal, groceryGoal, invoiceForCard, invoicesDueInMonth, limitUsed, monthFlow, openInvoiceMonth, overdueItems, spentInRange, variableSpending } from '../lib/finance.ts'
 import { formatBRL, round2 } from '../lib/money.ts'
 import { useStore } from '../state.tsx'
 
@@ -113,7 +113,14 @@ export function Dashboard() {
           <HeroChip label="Gastos fixos" value={formatBRL(report.fixedTotal)} />
           <HeroChip label="Faturas do mês" value={formatBRL(report.invoiceTotal)} />
           <HeroChip label="Pix, débito e dinheiro" value={formatBRL(report.cashTotal)} />
-          <HeroChip label="Saídas da empresa" value={formatBRL(flow.company.saidas)} />
+          <HeroChip
+            label="Saídas da empresa"
+            value={formatBRL(
+              flow.company.entries
+                .filter((entry) => entry.direction === 'saida' && !companyOnCard(entry))
+                .reduce((sum, entry) => sum + entry.amount, 0),
+            )}
+          />
         </div>
       </section>
 
@@ -252,7 +259,7 @@ export function Dashboard() {
                 const used = limitUsed(card, state, today)
                 const dueInvoice = invoicesDueInMonth(state, month).find((invoice) => invoice.cardId === card.id)
                 const open = openInvoiceMonth(today, card.closingDay)
-                const openInvoice = invoiceForCard(card, state.purchases, open.year, open.monthIndex, state.paidInvoices)
+                const openInvoice = invoiceForCard(card, state.purchases, open.year, open.monthIndex, state.paidInvoices, state.companyEntries)
                 const ratio = card.limit > 0 ? Math.min(used / card.limit, 1) : 0
                 return (
                   <li key={card.id}>
