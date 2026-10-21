@@ -18,7 +18,6 @@ import {
   schoolDaysOfWeek,
   schoolOccurs,
   shiftSchoolWeek,
-  weekLabel,
   SCHOOL_DAYS,
   SUBJECTS,
   todayTasks,
@@ -173,6 +172,44 @@ export function TodayScreen() {
   )
 }
 
+const POSTER_ROWS = ['early', 'mid', 'lunch', 'gap', 'after', 'late'] as const
+
+function posterBands(item: SchoolItem) {
+  if (item.start <= '13:00') return item.end > '13:50' ? ['early', 'mid'] : ['early']
+  if (item.start < '14:40') return ['mid']
+  if (item.start < '16:00') return ['lunch']
+  if (item.start < '17:00') return ['after']
+  return ['late']
+}
+
+function posterClock(value: string) {
+  const [hour, minute] = value.split(':')
+  return `${Number(hour)}h${minute}`
+}
+
+function posterTime(item: SchoolItem, band: string) {
+  if (band === 'early' && item.end > '13:50') return '13h00 às 13h50'
+  if (band === 'mid' && item.start < '13:50') return '13h50 às 14h40'
+  return item.end ? `${posterClock(item.start)} às ${posterClock(item.end)}` : posterClock(item.start)
+}
+
+function posterTone(title: string) {
+  const name = title.toLocaleLowerCase('pt-BR')
+  if (name.includes('lanche')) return { background: '#fff7fb', color: '#e11d48' }
+  if (name.includes('nata')) return { background: '#2dd4bf', color: '#134e4a' }
+  if (name.includes('laborat')) return { background: '#4ade80', color: '#14532d' }
+  if (name.includes('linguag') || name.includes('ciên') || name.includes('cien')) return { background: '#3b82f6', color: '#ffffff' }
+  if (name.includes('ingl')) return { background: '#e879f9', color: '#4a044e' }
+  if (name.includes('brincar')) return { background: '#5eead4', color: '#134e4a' }
+  if (name.includes('parque')) return { background: '#fde047', color: '#713f12' }
+  if (name.includes('físic') || name.includes('fisic')) return { background: '#38bdf8', color: '#0c4a6e' }
+  if (name.includes('arte')) return { background: '#d8b4fe', color: '#581c87' }
+  if (name.includes('rob') || name.includes('karat') || name.includes('danç') || name.includes('danc')) return { background: '#fb923c', color: '#7c2d12' }
+  if (name.includes('biblioteca')) return { background: '#bef264', color: '#365314' }
+  if (name.includes('brinquedo')) return { background: '#fb7185', color: '#ffffff' }
+  return { background: '#f9a8d4', color: '#831843' }
+}
+
 export function SchoolScreen() {
   const { state, role, today, saveSchool, removeSchool } = useRoutine()
   const [draft, setDraft] = useState<SchoolItem | null>(null)
@@ -184,11 +221,14 @@ export function SchoolScreen() {
     return schoolDaysOfWeek(today)[0]
   })
   const week = schoolDaysOfWeek(selected)
-  const lessons = state.school.filter((item) => schoolOccurs(item, selected)).slice().sort((a, b) => a.start.localeCompare(b.start))
-  const materials = lessons.filter((item) => item.materials.trim())
+  const materials = state.school.filter((item) => schoolOccurs(item, selected) && item.materials.trim()).sort((a, b) => a.start.localeCompare(b.start))
   const removing = state.school.find((item) => item.id === removeId)
   const earlier = shiftSchoolWeek(selected, -1)
   const later = shiftSchoolWeek(selected, 1)
+  const openNew = () => {
+    setError('')
+    setDraft({ id: uid(), title: '', emoji: '🎒', start: '13:00', end: '13:50', days: [selected.getDay()], week: 'all', until: '', materials: '' })
+  }
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -206,43 +246,79 @@ export function SchoolScreen() {
 
   return (
     <div>
-      <PageHeader
-        title="Rotina da escola"
-        text={role === 'parent' ? 'Calendário até 15 de dezembro. Ela acompanha a semana e o material, sem marcar como feito.' : 'Acompanhe a semana e confira o material do dia.'}
-        action={role === 'parent' ? <AddButton label="Nova aula" onClick={() => { setError(''); setDraft({ id: uid(), title: '', emoji: '🎒', start: '07:30', end: '', days: [selected.getDay()], week: 'all', until: '', materials: '' }) }} /> : null}
-      />
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb-4 text-center">
+        <h1 className="font-display text-4xl tracking-tight sm:text-5xl">Cronograma semanal</h1>
+        <p className="mt-1 font-extrabold">Professora Marcela · 2º ano E</p>
+        <p className="mt-1 text-sm font-bold text-[var(--soft)]">Até 15 de dezembro. Toque no dia para ver o material.</p>
+      </div>
+      <div className="mb-3 flex items-center justify-between gap-3">
         <button type="button" aria-label="Semana anterior" className="btn-ghost grid h-11 w-11 place-items-center text-2xl" disabled={dateKey(earlier) === dateKey(selected)} onClick={() => setSelected(earlier)}>
           ‹
         </button>
-        <p className="text-center text-sm font-extrabold text-[var(--soft)]">{isSwimWeek(selected) ? 'Semana da natação' : 'Semana da robótica'}</p>
+        <p className="text-center text-sm font-extrabold">{isSwimWeek(selected) ? 'Semana da natação' : 'Semana da robótica'}</p>
         <button type="button" aria-label="Próxima semana" className="btn-ghost grid h-11 w-11 place-items-center text-2xl" disabled={dateKey(later) === dateKey(selected)} onClick={() => setSelected(later)}>
           ›
         </button>
       </div>
-      <div className="mb-5 grid grid-cols-5 gap-2">
+      {role === 'parent' ? (
+        <div className="mb-3 flex justify-end">
+          <AddButton label="Nova aula" onClick={openNew} />
+        </div>
+      ) : null}
+      <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
         {week.map((date) => {
           const key = dateKey(date)
           const active = key === dateKey(selected)
+          const isToday = key === dateKey(today)
           return (
             <button
               key={key}
               type="button"
               aria-pressed={active}
               onClick={() => setSelected(date)}
-              className={`rounded-2xl px-1 py-3 text-center ${active ? 'bg-white shadow-md' : 'bg-white/55'}`}
+              className={`rounded-xl border-2 border-[#2b2b2b] px-1 py-2 text-center ${active ? 'bg-[#f9a8d4]' : 'bg-white'}`}
             >
-              <span className="block text-xs font-extrabold tracking-wide text-[var(--soft)] uppercase">{['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][date.getDay()]}</span>
-              <span className="font-display block text-2xl">{date.getDate()}</span>
+              <span className="block font-display text-[11px] leading-none sm:text-base">{['', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'][date.getDay()]}</span>
+              <span className="mt-1 block text-[10px] font-extrabold sm:text-xs">{isToday ? 'Hoje' : date.getDate()}</span>
             </button>
           )
         })}
+        {POSTER_ROWS.map((row) => week.map((date) => {
+          const item = state.school.find((lesson) => schoolOccurs(lesson, date) && posterBands(lesson).includes(row))
+          const key = `${row}-${dateKey(date)}`
+          if (!item) {
+            return <div key={key} className={`rounded-xl border-2 border-[#2b2b2b] bg-white ${row === 'gap' ? 'min-h-8 sm:min-h-10' : 'min-h-16 sm:min-h-20'}`} />
+          }
+          const tone = posterTone(item.title)
+          const label = item.title.toLocaleLowerCase('pt-BR').includes('lanche') ? 'Lanche' : item.title
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => {
+                setSelected(date)
+                if (role === 'parent') {
+                  setError('')
+                  setDraft(item)
+                }
+              }}
+              className="flex min-h-16 flex-col items-center justify-center rounded-xl border-2 border-[#2b2b2b] px-1 py-1.5 text-center sm:min-h-20 sm:px-2"
+              style={tone}
+            >
+              <span className="font-display text-[10px] leading-tight sm:text-sm">{label}</span>
+              <span className="mt-1 text-[8px] font-extrabold uppercase sm:text-[11px]">{posterTime(item, row)}</span>
+            </button>
+          )
+        }))}
       </div>
-      <section className="card mb-5 px-6 py-5">
+      <p className="mt-4 rounded-2xl bg-[#fbcfe8] px-4 py-3 text-center text-xs font-bold leading-relaxed sm:text-sm">
+        Robótica, Laboratório de Ciências, Natação, Dança e Karatê acontecem quinzenalmente. O cronograma pode mudar.
+      </p>
+      <section className="card mt-4 px-6 py-5">
         <p className="text-sm font-extrabold tracking-wide text-[var(--soft)] uppercase">Material do dia</p>
-        <h2 className="font-display mt-1 text-3xl">{formatLong(selected)}</h2>
+        <h2 className="font-display mt-1 text-2xl">{formatLong(selected)}</h2>
         {materials.length === 0 ? (
-          <p className="mt-3 text-[var(--soft)]">{role === 'parent' ? 'Escreva em cada aula o que vai na mochila.' : 'Nada extra para levar neste dia.'}</p>
+          <p className="mt-3 text-[var(--soft)]">{role === 'parent' ? 'Toque numa aula para escrever o que vai na mochila.' : 'Nada extra para levar neste dia.'}</p>
         ) : (
           <ul className="mt-4 grid gap-3">
             {materials.map((item) => (
@@ -257,22 +333,6 @@ export function SchoolScreen() {
           </ul>
         )}
       </section>
-      {lessons.length === 0 ? (
-        <EmptyState emoji="🎒" title="Sem aula neste dia" text={role === 'parent' ? 'Adicione a aula deste dia.' : 'Este dia não tem rotina de escola.'} />
-      ) : (
-        <div className="grid gap-3">
-          {lessons.map((item) => (
-            <ItemCard
-              key={item.id}
-              emoji={item.emoji}
-              title={item.title}
-              meta={[item.end ? `${item.start} – ${item.end}` : item.start, weekLabel(item.week)].filter(Boolean).join(' · ')}
-              onEdit={role === 'parent' ? () => { setError(''); setDraft(item) } : undefined}
-              onDelete={role === 'parent' ? () => setRemoveId(item.id) : undefined}
-            />
-          ))}
-        </div>
-      )}
       {draft ? (
         <FormModal title={state.school.some((item) => item.id === draft.id) ? 'Editar aula' : 'Nova aula'} onClose={() => setDraft(null)} onSubmit={submit}>
           <EmojiField value={draft.emoji} onChange={(emoji) => setDraft({ ...draft, emoji })} />
@@ -291,6 +351,11 @@ export function SchoolScreen() {
             </Field>
           </div>
           <DayField value={draft.days} onChange={(days) => setDraft({ ...draft, days })} />
+          {state.school.some((item) => item.id === draft.id) ? (
+            <button type="button" className="justify-self-start text-sm font-extrabold text-rose-500" onClick={() => { setRemoveId(draft.id); setDraft(null) }}>
+              Apagar esta aula
+            </button>
+          ) : null}
           {error ? <p className="text-sm font-bold text-rose-500">{error}</p> : null}
         </FormModal>
       ) : null}
