@@ -1,0 +1,18 @@
+{
+  "name": "Rotina da Casa Clara",
+  "short_name": "Rotina",
+  "start_url": "./rotina.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fff7fb",
+  "theme_color": "#fbcfe8",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "rotina-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

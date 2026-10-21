@@ -1,0 +1,187 @@
+@import "tailwindcss";
+
+.routine-root {
+  --ink: #5b3a63;
+  --soft: #8d6d96;
+  --line: #f3e8ff;
+  min-height: 100vh;
+  color: var(--ink);
+  font-family: "Nunito", ui-sans-serif, system-ui, sans-serif;
+  background:
+    radial-gradient(ellipse at 8% -10%, #fbcfe8 0%, transparent 46%),
+    radial-gradient(ellipse at 100% 0%, #ddd6fe 0%, transparent 42%),
+    radial-gradient(ellipse at 50% 120%, #fce7f3 0%, transparent 46%),
+    linear-gradient(180deg, #fff7fb 0%, #f6f1ff 100%);
+}
+
+.routine-root .font-display {
+  font-family: "Fredoka", "Nunito", sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.blob {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(2px);
+  opacity: 0.7;
+  animation: floaty 9s ease-in-out infinite;
+}
+
+.blob-a { top: 8%; left: -4rem; height: 10rem; width: 10rem; background: #f9a8d4; }
+.blob-b { top: 28%; right: -3rem; height: 12rem; width: 12rem; background: #ddd6fe; animation-delay: -3s; }
+.blob-c { bottom: 8%; left: 20%; height: 8rem; width: 8rem; background: #fbcfe8; animation-delay: -5s; }
+
+.sparkle {
+  position: absolute;
+  color: #e879f9;
+  animation: twinkle 3.4s ease-in-out infinite;
+  font-size: 1.1rem;
+}
+.sparkle-1 { top: 14%; right: 18%; }
+.sparkle-2 { top: 42%; left: 8%; color: #f472b6; animation-delay: -1s; }
+.sparkle-3 { bottom: 22%; right: 12%; animation-delay: -2s; }
+
+.card {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  border-radius: 1.75rem;
+  box-shadow: 0 16px 40px rgba(192, 132, 252, 0.14);
+}
+
+.btn-primary,
+.btn-ghost,
+.btn-soft {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 3rem;
+  border-radius: 999px;
+  padding: 0.7rem 1.2rem;
+  font-family: "Fredoka", "Nunito", sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #f472b6, #c084fc);
+  color: white;
+  box-shadow: 0 10px 24px rgba(192, 132, 252, 0.35);
+}
+
+.btn-primary:disabled,
+.btn-soft:disabled,
+.btn-ghost:disabled { opacity: 0.45; }
+
+.btn-ghost {
+  background: white;
+  color: var(--ink);
+  border: 2px solid #f3e8ff;
+}
+
+.btn-soft {
+  background: #fdf2f8;
+  color: #a21caf;
+}
+
+.field-input {
+  width: 100%;
+  min-height: 3rem;
+  border-radius: 1rem;
+  border: 2px solid #f3e8ff;
+  background: white;
+  padding: 0.75rem 1rem;
+  font: inherit;
+  color: inherit;
+}
+
+.field-input:focus {
+  outline: none;
+  border-color: #e879f9;
+  box-shadow: 0 0 0 4px rgba(232, 121, 249, 0.15);
+}
+
+.choice {
+  min-height: 2.75rem;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background: white;
+  padding: 0.35rem 0.8rem;
+  font-weight: 700;
+}
+
+.choice[aria-pressed="true"] {
+  border-color: #e879f9;
+  background: #fdf2f8;
+  color: #a21caf;
+}
+
+.avatar-bob { animation: bob 3.2s ease-in-out infinite; transform-origin: center bottom; }
+.nav-pill[aria-current="page"] {
+  background: linear-gradient(135deg, #f9a8d4, #d8b4fe);
+  color: white;
+  box-shadow: 0 8px 18px rgba(216, 180, 254, 0.45);
+}
+
+.check-pop { animation: pop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1); }
+.shake { animation: shake 0.4s ease; }
+.ring-pulse { animation: ring 1.4s ease-in-out infinite; }
+
+.confetti {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  width: 0.45rem;
+  height: 0.7rem;
+  border-radius: 999px;
+  background: var(--c, #f472b6);
+  animation: burst 0.8s ease-out forwards;
+}
+
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-16px); }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.8) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.15) rotate(12deg); }
+}
+
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes pop {
+  0% { transform: scale(0.7); }
+  60% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+@keyframes ring {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+@keyframes burst {
+  to {
+    transform: translate(calc((var(--x) - 0.5) * 140px), calc((var(--y) - 0.8) * 120px)) rotate(180deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .routine-root *,
+  .routine-root *::before,
+  .routine-root *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

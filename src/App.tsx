@@ -12,6 +12,7 @@ import { FuelPage, GroceryPage, LeisurePage } from './pages/SpendingPages.tsx'
 import { HouseGate } from './auth.tsx'
 import { CoupleMark, ThemeToggle } from './components/Brand.tsx'
 import { signOut } from './lib/cloud.ts'
+import { openRoutine } from './routine/door.ts'
 import { StoreProvider, useStore, type Page } from './state.tsx'
 
 const NAV: { id: Page['id']; label: string; icon: 'home' | 'late' | 'fixed' | 'card' | 'market' | 'leisure' | 'fuel' | 'company' | 'goal' | 'saving' | 'plan' }[] = [
@@ -121,6 +122,9 @@ function Shell() {
             </div>
             <div className="flex items-center gap-3">
               <ThemeToggle />
+              <button type="button" onClick={openRoutine} className="text-sm font-medium text-ink-soft hover:text-ink">
+                Rotina
+              </button>
               <button type="button" onClick={() => void signOut()} className="text-sm font-medium text-ink-soft hover:text-ink">
                 Sair
               </button>

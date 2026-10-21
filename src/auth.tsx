@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { CoupleMark } from './components/Brand.tsx'
 import { Button, Field, fieldClass } from './components/ui.tsx'
 import { cloudReady, signIn, supabase } from './lib/cloud.ts'
+import { openRoutine } from './routine/door.ts'
 
 export function HouseGate({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false)
@@ -74,6 +75,9 @@ export function HouseGate({ children }: { children: ReactNode }) {
           <Button type="submit" className="mt-4 w-full" disabled={busy || password.length === 0}>
             Entrar
           </Button>
+          <button type="button" onClick={openRoutine} className="mt-4 w-full text-sm font-medium text-ink-soft hover:text-ink">
+            Cantinho da rotina
+          </button>
         </form>
       </div>
     )
