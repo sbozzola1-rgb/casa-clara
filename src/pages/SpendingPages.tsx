@@ -28,7 +28,7 @@ export function GroceryPage() {
       <PageIntro
         eyebrow="Meta mensal"
         title="Mercado"
-        description="As compras entram pelo valor cheio, no mês em que aconteceram. Vale alimentação e outras entradas aumentam a meta desse mês."
+        description="À vista entra no mês da compra. No parcelado, entra só a parcela daquele mês. Vale alimentação e outras entradas aumentam a meta."
         action={<Button onClick={() => setDialog('new')}>Lançar compra</Button>}
       />
 
@@ -123,7 +123,7 @@ export function FuelPage() {
       <PageIntro
         eyebrow="Meta mensal"
         title="Combustível"
-        description="Cada abastecimento entra pelo valor cheio, no mês da data. A meta pode ser a padrão ou só deste mês."
+        description="À vista entra no mês da data. No parcelado, entra só a parcela daquele mês. A meta pode ser a padrão ou só deste mês."
         action={<Button onClick={() => setDialog('new')}>Lançar abastecimento</Button>}
       />
 
@@ -189,7 +189,7 @@ export function LeisurePage() {
       <PageIntro
         eyebrow="Teto semanal"
         title="Lazer"
-        description="O teto é o máximo da semana, não uma média. Cinema, delivery, saída e qualquer compra marcada como lazer entram na semana da data."
+        description="O teto é o máximo da semana, não uma média. À vista entra na semana da data. No parcelado, entra só a parcela daquela semana."
         action={<Button onClick={() => setDialog('new')}>Lançar gasto</Button>}
       />
 
@@ -259,7 +259,7 @@ function EntryList({
   return (
     <ul className="overflow-hidden rounded-2xl border border-line bg-card">
       {entries.map((entry) => (
-        <li key={`${entry.source}-${entry.id}`} className="border-b border-line last:border-b-0">
+        <li key={`${entry.source}-${entry.id}-${entry.installment ?? 0}`} className="border-b border-line last:border-b-0">
           <button type="button" onClick={() => onEdit(entry)} className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left">
             <span>
               <span className="block font-medium">{entry.description}</span>

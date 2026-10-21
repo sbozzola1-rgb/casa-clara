@@ -98,7 +98,7 @@ export function invoiceForCard(
   const lines: InvoiceLine[] = []
   const sources: Purchase[] = [
     ...purchases,
-    ...companyEntries.filter((entry) => companyOnCard(entry) && entry.cardId === card.id).map((entry) => ({
+    ...companyEntries.filter((entry) => companyOnCard(entry) && entry.cardId === card.id && !purchases.some((item) => item.id === entry.purchaseId)).map((entry) => ({
       id: entry.id,
       cardId: entry.cardId ?? '',
       description: entry.description,
@@ -165,7 +165,7 @@ export function limitUsed(card: CreditCard, state: AppState, today: Date): numbe
     }
   }
   for (const entry of state.companyEntries) {
-    if (!companyOnCard(entry) || entry.cardId !== card.id) continue
+    if (!companyOnCard(entry) || entry.cardId !== card.id || state.purchases.some((item) => item.id === entry.purchaseId)) continue
     for (const installment of installmentSchedule({ amount: entry.amount, installments: entry.installments, date: entry.date })) {
       const bill = invoiceMonthFor(installment.date, card.closingDay)
       if (state.paidInvoices[invoiceKey(card.id, bill.year, bill.monthIndex)]) continue
@@ -206,19 +206,21 @@ export function fuelGoal(state: AppState, month: string): { amount: number | nul
 export function spendEntries(state: AppState, category: BudgetCategory): SpendEntry[] {
   const fromCards: SpendEntry[] = state.purchases
     .filter((purchase) => purchase.category === category)
-    .map((purchase) => {
+    .flatMap((purchase) => {
       const card = state.cards.find((item) => item.id === purchase.cardId)
-      const parcels = purchase.installments > 1 ? `${purchase.installments}x` : 'à vista'
-      return {
+      return installmentSchedule(purchase).map((installment) => ({
         id: purchase.id,
         source: 'card' as const,
         description: purchase.description,
-        amount: purchase.amount,
-        date: purchase.date,
+        amount: installment.amount,
+        date: formatISO(installment.date),
         category,
-        detail: `${card?.nickname ?? 'Cartão'} · ${parcels}`,
+        detail: installment.total > 1
+          ? `${card?.nickname ?? 'Cartão'} · parcela ${installment.index} de ${installment.total}`
+          : `${card?.nickname ?? 'Cartão'} · à vista`,
         cardId: purchase.cardId,
-      }
+        installment: installment.index,
+      }))
     })
   const fromCash: SpendEntry[] = state.cashExpenses
     .filter((expense) => expense.category === category)
@@ -254,8 +256,10 @@ export function variableSpending(state: AppState, month: string): CategorySlice[
   const { start, end } = monthRange(month)
   const totals = new Map<string, number>()
   for (const purchase of state.purchases) {
-    if (!inRange(parseDate(purchase.date), start, end)) continue
-    totals.set(purchase.category, round2((totals.get(purchase.category) ?? 0) + purchase.amount))
+    for (const installment of installmentSchedule(purchase)) {
+      if (!inRange(installment.date, start, end)) continue
+      totals.set(purchase.category, round2((totals.get(purchase.category) ?? 0) + installment.amount))
+    }
   }
   for (const expense of state.cashExpenses) {
     if (!inRange(parseDate(expense.date), start, end)) continue

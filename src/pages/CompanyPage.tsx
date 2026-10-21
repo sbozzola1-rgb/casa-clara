@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CompanyDialog } from '../components/dialogs.tsx'
+import { CompanyDialog, LinkLaunchDialog } from '../components/dialogs.tsx'
 import { Button, EmptyState, FlowChart, PageIntro, Panel } from '../components/ui.tsx'
 import { formatFriendly, monthTitle } from '../lib/dates.ts'
 import { companyInMonth, companyOnCard, flowSeries } from '../lib/finance.ts'
@@ -10,6 +10,7 @@ import { useStore } from '../state.tsx'
 export function CompanyPage() {
   const { state, month, today } = useStore()
   const [editing, setEditing] = useState<CompanyEntry | null | 'new'>(null)
+  const [linking, setLinking] = useState(false)
   const company = companyInMonth(state, month)
   const balance = round2(company.entradas - company.saidas)
   const series = flowSeries(
@@ -33,7 +34,14 @@ export function CompanyPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <Panel title={monthTitle(month)}>
+        <Panel
+          title={monthTitle(month)}
+          action={
+            <Button variant="secondary" className="h-9" onClick={() => setLinking(true)}>
+              Buscar lançamento
+            </Button>
+          }
+        >
           {company.entries.length === 0 ? (
             <EmptyState
               title="Nenhum movimento"
@@ -70,6 +78,7 @@ export function CompanyPage() {
       </div>
 
       {editing !== null ? <CompanyDialog entry={editing === 'new' ? null : editing} onClose={() => setEditing(null)} /> : null}
+      {linking ? <LinkLaunchDialog onClose={() => setLinking(false)} /> : null}
     </div>
   )
 }
@@ -78,7 +87,8 @@ function companyPaymentLabel(entry: CompanyEntry, cards: { id: string; nickname:
   if (companyOnCard(entry)) {
     const card = cards.find((item) => item.id === entry.cardId)
     const name = card?.nickname ?? 'Cartão'
-    return entry.installments > 1 ? `${name} · ${entry.installments}x` : name
+    const times = entry.installments > 1 ? ` · ${entry.installments}x` : ''
+    return entry.purchaseId ? `${name}${times} · compra do cartão` : `${name}${times}`
   }
   return COMPANY_PAYMENTS.find((item) => item.id === entry.method)?.label ?? 'Pix'
 }

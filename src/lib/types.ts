@@ -187,6 +187,7 @@ export interface CompanyEntry {
   method: CompanyPayment
   cardId: string | null
   installments: number
+  purchaseId: string | null
 }
 
 export interface AppState {
@@ -213,6 +214,7 @@ export interface SpendEntry {
   category: BudgetCategory
   detail: string
   cardId?: string
+  installment?: number
 }
 
 export function emptyState(): AppState {

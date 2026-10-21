@@ -134,6 +134,7 @@ export function sanitize(input: unknown): AppState | null {
                 method: payment === 'cartao' && direction === 'saida' && cardId.length === 0 ? 'pix' : payment,
                 cardId: cardId.length > 0 ? cardId : null,
                 installments: cardId.length > 0 ? Math.min(24, Math.max(1, Math.round(Number(item.installments)) || 1)) : 1,
+                purchaseId: text(item.purchaseId).trim() || null,
               },
             ]
           })

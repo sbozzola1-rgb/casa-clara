@@ -67,7 +67,12 @@ const paidNovember = stateWith([mercado, parcelado], { 'card-1:2026-11': true })
 assert(limitUsed(card, paidNovember, today) === 200, 'fatura paga libera o que estava nela')
 
 const grocery = spentInRange(state, 'mercado', parseDate('2026-10-01'), parseDate('2026-10-31'))
-assert(grocery.total === 400, 'meta de mercado usa o valor cheio no mês da compra')
+assert(grocery.total === 400, 'compra à vista entra inteira no mês')
+const airbnb = stateWith([purchase({ id: 'airbnb', date: '2026-09-05', amount: 1305.24, installments: 6, category: 'lazer' })])
+const setembro = spentInRange(airbnb, 'lazer', parseDate('2026-09-01'), parseDate('2026-09-30'))
+assert(setembro.total === 217.54, 'parcelado entra só com a parcela do mês')
+assert(setembro.entries[0]?.detail.endsWith('parcela 1 de 6'), 'a lista identifica a parcela')
+assert(spentInRange(airbnb, 'lazer', parseDate('2026-10-01'), parseDate('2026-10-31')).total === 217.54, 'a parcela seguinte cai no mês seguinte')
 
 const week = startOfWeek(parseDate('2026-10-20'))
 assert(week.getDate() === 19 && week.getMonth() === 9, 'semana começa na segunda')
@@ -119,6 +124,13 @@ const companyCard = {
 }
 assert(monthFlow(companyCard, '2026-10').expense === 0, 'saída no cartão não soma de novo em outubro')
 assert(invoiceForCard(card, [], 2026, 10, {}, companyCard.companyEntries).total === 300, 'saída da empresa entra na fatura de novembro')
+const linkedPurchase = purchase({ id: 'ja-no-cartao', date: '2026-10-20', amount: 300 })
+const linked = {
+  ...companyCard,
+  purchases: [linkedPurchase],
+  companyEntries: [{ ...companyCard.companyEntries[0], purchaseId: 'ja-no-cartao' }],
+}
+assert(invoiceForCard(card, linked.purchases, 2026, 10, {}, linked.companyEntries).total === 300, 'compra vinculada não entra duas vezes na fatura')
 
 const late = overdueItems(household, parseDate('2026-10-20'))
 assert(late.some((item) => item.expenseId === 'aluguel' && item.month === '2026-10'), 'aluguel de outubro vencido entra na gestão')

@@ -308,7 +308,7 @@ export function Dashboard() {
           </ul>
         )}
         <p className="mt-4 text-xs leading-relaxed text-ink-soft">
-          Aqui entra o valor cheio da compra, na data em que ela foi feita. A fatura do cartão pode cair em outro mês quando a compra é parcelada ou passa do fechamento.
+          À vista entra no mês da compra. No parcelado, entra só a parcela daquele mês. A fatura do cartão segue o fechamento.
         </p>
       </Panel>
 

@@ -436,7 +436,7 @@ export function PurchaseDialog({
     <>
       <Modal
         title={purchase ? 'Editar compra' : 'Nova compra'}
-        description="Mercado, lazer e combustível entram na meta pelo valor cheio, no dia da compra. A fatura recebe as parcelas."
+        description="Na meta, à vista entra no dia da compra e o parcelado entra pela parcela de cada mês. A fatura recebe a mesma parcela."
         onClose={onClose}
         footer={
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -644,7 +644,7 @@ export function SpendDialog({
     <>
       <Modal
         title={entry ? `Editar ${title.toLowerCase()}` : title}
-        description="O valor inteiro entra na meta no dia em que a compra aconteceu."
+        description="À vista entra na meta no dia da compra. No cartão parcelado, entra uma parcela por mês."
         onClose={onClose}
         footer={
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1051,6 +1051,107 @@ function incomeWhen(source: IncomeSource): string {
   return `${who} · todo dia ${when.getDate()}, desde ${formatShort(when)}`
 }
 
+export function LinkLaunchDialog({ onClose }: { onClose: () => void }) {
+  const { state, upsertCompany } = useStore()
+  const [method, setMethod] = useState<CompanyPayment | ''>('')
+  const [cardId, setCardId] = useState(state.cards[0]?.id ?? '')
+  const [amount, setAmount] = useState('')
+  const parsed = parseMoney(amount)
+  const linked = new Set(state.companyEntries.map((entry) => entry.purchaseId).filter((id): id is string => Boolean(id)))
+  const matches = method === 'cartao' && cardId && parsed != null
+    ? state.purchases.filter((purchase) => {
+        if (purchase.cardId !== cardId || linked.has(purchase.id)) return false
+        if (Math.abs(purchase.amount - parsed) < 0.01) return true
+        return installmentSchedule(purchase).some((item) => Math.abs(item.amount - parsed) < 0.05)
+      })
+    : []
+
+  return (
+    <Modal
+      title="Buscar lançamento"
+      description="Escolha cartão de crédito, o cartão e o valor. A compra que já está em Cartões entra na empresa e não se repete na fatura."
+      onClose={onClose}
+      footer={
+        <div className="flex justify-end">
+          <Button variant="ghost" onClick={onClose}>
+            Fechar
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4 pb-2">
+        <Field label="Forma de pagamento">
+          <select className={fieldClass} value={method} onChange={(event) => setMethod(event.target.value as CompanyPayment | '')}>
+            <option value="">Escolher</option>
+            {COMPANY_PAYMENTS.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {method === 'cartao' ? (
+          <Field label="Cartão">
+            <select className={fieldClass} value={cardId} onChange={(event) => setCardId(event.target.value)}>
+              {state.cards.length === 0 ? <option value="">Nenhum cartão</option> : null}
+              {state.cards.map((card) => (
+                <option key={card.id} value={card.id}>
+                  {card.nickname}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : method ? (
+          <p className="text-sm text-ink-soft">Dá para vincular uma compra que já está em Cartões. Escolha cartão de crédito.</p>
+        ) : null}
+        {method === 'cartao' && cardId ? (
+          <MoneyField label="Valor" value={amount} onChange={setAmount} />
+        ) : null}
+        {method === 'cartao' && cardId && parsed != null ? (
+          matches.length === 0 ? (
+            <p className="text-sm text-ink-soft">Nenhuma compra com esse valor neste cartão.</p>
+          ) : (
+            <ul className="divide-y divide-line rounded-xl border border-line">
+              {matches.slice(0, 12).map((purchase) => (
+                <li key={purchase.id}>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left"
+                    onClick={() => {
+                      upsertCompany({
+                        id: uid(),
+                        direction: 'saida',
+                        description: purchase.description,
+                        amount: purchase.amount,
+                        date: purchase.date,
+                        category: 'Fornecedor',
+                        method: 'cartao',
+                        cardId: purchase.cardId,
+                        installments: purchase.installments,
+                        purchaseId: purchase.id,
+                      })
+                      onClose()
+                    }}
+                  >
+                    <span>
+                      <span className="block text-sm font-medium">{purchase.description}</span>
+                      <span className="block text-xs text-ink-soft">
+                        {formatShort(parseDate(purchase.date))}
+                        {purchase.installments > 1 ? ` · ${purchase.installments}x` : ' · à vista'}
+                      </span>
+                    </span>
+                    <span className="text-sm tabular-nums">{formatBRL(purchase.amount)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )
+        ) : null}
+      </div>
+    </Modal>
+  )
+}
+
 export function CompanyDialog({ entry, onClose }: { entry: CompanyEntry | null; onClose: () => void }) {
   const { state, upsertCompany, removeCompany } = useStore()
   const [direction, setDirection] = useState<CompanyDirection>(entry?.direction ?? 'saida')
@@ -1098,6 +1199,7 @@ export function CompanyDialog({ entry, onClose }: { entry: CompanyEntry | null; 
       method,
       cardId: payByCard ? cardId : null,
       installments: payByCard ? count : 1,
+      purchaseId: payByCard ? (entry?.purchaseId ?? null) : null,
     })
     onClose()
   }

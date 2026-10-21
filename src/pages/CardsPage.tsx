@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { CardDialog, PurchaseDialog } from '../components/dialogs.tsx'
 import { Button, EmptyState, PageIntro, Panel } from '../components/ui.tsx'
 import { formatFriendly, formatShort, monthKey, monthTitle, shiftMonth } from '../lib/dates.ts'
-import { billingMonthForDue, invoiceDueDate, invoiceForCard, limitUsed, openInvoiceMonth } from '../lib/finance.ts'
+import { billingMonthForDue, installmentSchedule, invoiceDueDate, invoiceForCard, limitUsed, openInvoiceMonth } from '../lib/finance.ts'
 import { formatBRL, round2 } from '../lib/money.ts'
-import { cardPalette, categoryLabel, type CreditCard, type Purchase } from '../lib/types.ts'
+import { cardPalette, categoryLabel, type CreditCard, type CustomCategory, type Purchase } from '../lib/types.ts'
 import { useStore } from '../state.tsx'
 
 export function CardsPage() {
@@ -199,27 +199,11 @@ export function CardDetail({ cardId }: { cardId: string }) {
             )}
           </Panel>
 
-          <Panel title="Compras deste cartão" className="mt-4">
-            {purchases.length === 0 ? (
-              <p className="text-sm text-ink-soft">Nenhuma compra lançada.</p>
-            ) : (
-              <ul className="divide-y divide-line">
-                {purchases.map((item) => (
-                  <li key={item.id}>
-                    <button type="button" onClick={() => setPurchase(item)} className="flex w-full items-center justify-between gap-3 py-3 text-left">
-                      <span>
-                        <span className="block text-sm font-medium">{item.description}</span>
-                        <span className="block text-xs text-ink-soft">
-                          {formatFriendly(item.date, today)} · {categoryLabel(item.category, state.customCategories)}
-                          {item.installments > 1 ? ` · ${item.installments}x` : ' · à vista'}
-                        </span>
-                      </span>
-                      <span className="tabular-nums">{formatBRL(item.amount)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+          <Panel title="À vista" className="mt-4">
+            <PurchaseList items={purchases.filter((item) => item.installments <= 1)} today={today} custom={state.customCategories} onOpen={setPurchase} empty="Nenhuma compra à vista neste cartão." />
+          </Panel>
+          <Panel title="Parceladas" className="mt-4">
+            <PurchaseList items={purchases.filter((item) => item.installments > 1)} today={today} custom={state.customCategories} onOpen={setPurchase} empty="Nenhuma compra parcelada neste cartão." />
           </Panel>
         </div>
       </div>
@@ -229,6 +213,43 @@ export function CardDetail({ cardId }: { cardId: string }) {
       ) : null}
       {editingCard ? <CardDialog card={card} onClose={() => setEditingCard(false)} /> : null}
     </div>
+  )
+}
+
+function PurchaseList({
+  items,
+  today,
+  custom,
+  onOpen,
+  empty,
+}: {
+  items: Purchase[]
+  today: Date
+  custom: CustomCategory[]
+  onOpen: (item: Purchase) => void
+  empty: string
+}) {
+  if (items.length === 0) return <p className="text-sm text-ink-soft">{empty}</p>
+  return (
+    <ul className="divide-y divide-line">
+      {items.map((item) => {
+        const parcela = installmentSchedule(item)[0]?.amount ?? item.amount
+        return (
+          <li key={item.id}>
+            <button type="button" onClick={() => onOpen(item)} className="flex w-full items-center justify-between gap-3 py-3 text-left">
+              <span>
+                <span className="block text-sm font-medium">{item.description}</span>
+                <span className="block text-xs text-ink-soft">
+                  {formatFriendly(item.date, today)} · {categoryLabel(item.category, custom)}
+                  {item.installments > 1 ? ` · ${item.installments}x · total ${formatBRL(item.amount)}` : ' · à vista'}
+                </span>
+              </span>
+              <span className="tabular-nums">{formatBRL(item.installments > 1 ? parcela : item.amount)}</span>
+            </button>
+          </li>
+        )
+      })}
+    </ul>
   )
 }
 
