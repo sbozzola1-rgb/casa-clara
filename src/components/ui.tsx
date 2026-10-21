@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { formatBRL, round2 } from '../lib/money.ts'
 
 export const fieldClass =
-  'w-full rounded-xl border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink/30 focus:border-moss focus:ring-2 focus:ring-moss/20'
+  'w-full rounded-xl border border-line bg-card px-3 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink/30 focus:border-moss focus:ring-2 focus:ring-moss/20'
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
@@ -10,10 +10,10 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 export function Button({ variant = 'primary', className = '', type = 'button', ...props }: ButtonProps) {
   const styles = {
-    primary: 'bg-moss text-white hover:bg-moss-deep',
-    secondary: 'bg-ink text-white hover:bg-[#243044]',
-    ghost: 'text-ink hover:bg-[#efe9dc]',
-    danger: 'text-clay hover:bg-[#f8e6e3]',
+    primary: 'bg-moss text-white hover:bg-moss-deep dark:text-night',
+    secondary: 'bg-night text-white hover:bg-raised',
+    ghost: 'text-ink hover:bg-hover',
+    danger: 'text-clay hover:bg-clay-soft',
   }
   return (
     <button
@@ -135,7 +135,7 @@ export function BudgetMeter({ spent, goal }: { spent: number; goal: number | nul
         <p className="font-serif text-4xl tracking-tight tabular-nums">{formatBRL(spent)}</p>
         <p className="text-sm text-ink-soft">de {formatBRL(goal)}</p>
       </div>
-      <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-[#e7e1d4]">
+      <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-track">
         <div className={`h-full rounded-full transition-all ${tone}`} style={{ width: `${Math.max(ratio * 100, spent > 0 ? 3 : 0)}%` }} />
       </div>
       <p className={`mt-2 text-sm font-medium ${over ? 'text-clay' : 'text-moss'}`}>
@@ -156,7 +156,7 @@ export function CompareBars({ items }: { items: { key: string; label: string; sp
           const over = item.goal != null && item.spent > item.goal
           return (
             <div key={item.key} className="flex min-w-0 flex-1 flex-col items-center gap-2">
-              <div className="relative h-28 w-full rounded-md bg-[#f6f1e7]">
+              <div className="relative h-28 w-full rounded-md bg-chart">
                 <div
                   className={`absolute right-1 bottom-1 left-1 rounded-sm ${over ? 'bg-clay' : 'bg-moss'}`}
                   style={{ height: `${spentHeight}%`, minHeight: item.spent > 0 ? 4 : 0 }}
@@ -208,10 +208,10 @@ export function FlowChart({ items }: { items: { key: string; label: string; inco
 
 export function ToneBadge({ tone, children }: { tone: 'paid' | 'overdue' | 'soon' | 'open'; children: ReactNode }) {
   const styles = {
-    paid: 'bg-[#e5f2eb] text-moss',
-    overdue: 'bg-[#f8e6e3] text-clay',
-    soon: 'bg-[#f8ecd9] text-amber',
-    open: 'bg-[#efe9dc] text-ink-soft',
+    paid: 'bg-moss-soft text-moss',
+    overdue: 'bg-clay-soft text-clay',
+    soon: 'bg-amber-soft text-amber',
+    open: 'bg-hover text-ink-soft',
   }
   return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${styles[tone]}`}>{children}</span>
 }

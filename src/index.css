@@ -12,6 +12,37 @@
   --color-moss-deep: #184f37;
   --color-clay: #9d3b32;
   --color-amber: #a15c12;
+  --color-night: #172033;
+  --color-raised: #243044;
+  --color-moss-soft: #e5f2eb;
+  --color-clay-soft: #f8e6e3;
+  --color-amber-soft: #f8ecd9;
+  --color-track: #e7e1d4;
+  --color-hover: #efe9dc;
+  --color-chart: #f6f1e7;
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+html.dark {
+  --color-ink: #f6f1e8;
+  --color-ink-soft: #b7c0cc;
+  --color-paper: #10161f;
+  --color-card: #1a2330;
+  --color-line: #2e3b4c;
+  --color-moss: #8fd4ae;
+  --color-moss-deep: #b7ebcf;
+  --color-clay: #f3b2ab;
+  --color-amber: #f3d19a;
+  --color-night: #0c1218;
+  --color-raised: #314158;
+  --color-moss-soft: #173528;
+  --color-clay-soft: #3d2422;
+  --color-amber-soft: #3a2e18;
+  --color-track: #2a3442;
+  --color-hover: #243040;
+  --color-chart: #243040;
+  color-scheme: dark;
 }
 
 body {
@@ -28,6 +59,10 @@ body {
 
 ::selection {
   background: #cfe3d8;
+}
+
+html.dark ::selection {
+  background: #1f4d38;
 }
 
 input[type="number"]::-webkit-outer-spin-button,

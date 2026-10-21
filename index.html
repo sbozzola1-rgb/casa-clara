@@ -5,7 +5,16 @@
     <link rel="icon" type="image/jpeg" href="%BASE_URL%casal-carioca.jpg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#172033" />
-    <title>Finanças do casal carioca</title>
+    <title>Finanças do Casal Carioca</title>
+    <script>
+      try {
+        var theme = localStorage.getItem('casa-clara.theme')
+        var dark = theme === 'dark' || (theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)
+        if (dark) document.documentElement.classList.add('dark')
+        var meta = document.querySelector('meta[name="theme-color"]')
+        if (meta && dark) meta.setAttribute('content', '#10161f')
+      } catch (e) {}
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

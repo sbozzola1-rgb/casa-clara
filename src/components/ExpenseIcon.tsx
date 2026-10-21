@@ -11,7 +11,7 @@ export function ExpenseIcon({ name }: { name: string }) {
 
 export function ExpenseMark({ name }: { name: string }) {
   return (
-    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e5f2eb] text-moss">
+    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-moss-soft text-moss">
       <ExpenseIcon name={name} />
     </span>
   )

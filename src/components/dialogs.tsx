@@ -205,7 +205,7 @@ export function FixedDialog({ expense, onClose }: { expense: FixedExpense | null
                     setIcon(item.id)
                     setIconChosen(true)
                   }}
-                  className={`flex h-14 flex-col items-center justify-center gap-1 rounded-xl border text-[10px] ${icon === item.id ? 'border-moss bg-[#e5f2eb] text-moss' : 'border-line bg-white text-ink'}`}
+                  className={`flex h-14 flex-col items-center justify-center gap-1 rounded-xl border text-[10px] ${icon === item.id ? 'border-moss bg-moss-soft text-moss' : 'border-line bg-card text-ink'}`}
                 >
                   <ExpenseIcon name={item.id} />
                   {item.label}
@@ -812,7 +812,7 @@ export function GroceryInflowDialog({ month, entry, onClose }: { month: string; 
                 type="button"
                 aria-pressed={repeat === 'once'}
                 onClick={() => setRepeat('once')}
-                className={`rounded-xl border px-3 py-2.5 text-sm ${repeat === 'once' ? 'border-moss bg-[#e5f2eb] text-moss' : 'border-line bg-white'}`}
+                className={`rounded-xl border px-3 py-2.5 text-sm ${repeat === 'once' ? 'border-moss bg-moss-soft text-moss' : 'border-line bg-card'}`}
               >
                 Só neste mês
               </button>
@@ -820,7 +820,7 @@ export function GroceryInflowDialog({ month, entry, onClose }: { month: string; 
                 type="button"
                 aria-pressed={repeat === 'monthly'}
                 onClick={() => setRepeat('monthly')}
-                className={`rounded-xl border px-3 py-2.5 text-sm ${repeat === 'monthly' ? 'border-moss bg-[#e5f2eb] text-moss' : 'border-line bg-white'}`}
+                className={`rounded-xl border px-3 py-2.5 text-sm ${repeat === 'monthly' ? 'border-moss bg-moss-soft text-moss' : 'border-line bg-card'}`}
               >
                 Todo mês
               </button>
@@ -987,7 +987,7 @@ export function IncomeDialog({ onClose }: { onClose: () => void }) {
                     type="button"
                     aria-pressed={person === item.id}
                     onClick={() => setPerson(item.id)}
-                    className={`h-10 rounded-xl border text-sm font-medium ${person === item.id ? 'border-moss bg-[#e5f2eb] text-moss' : 'border-line bg-white text-ink'}`}
+                    className={`h-10 rounded-xl border text-sm font-medium ${person === item.id ? 'border-moss bg-moss-soft text-moss' : 'border-line bg-card text-ink'}`}
                   >
                     {item.label}
                   </button>
@@ -1004,7 +1004,7 @@ export function IncomeDialog({ onClose }: { onClose: () => void }) {
                   type="button"
                   aria-pressed={repeat === 'monthly'}
                   onClick={() => setRepeat('monthly')}
-                  className={`h-10 rounded-xl border text-sm font-medium ${repeat === 'monthly' ? 'border-moss bg-[#e5f2eb] text-moss' : 'border-line bg-white text-ink'}`}
+                  className={`h-10 rounded-xl border text-sm font-medium ${repeat === 'monthly' ? 'border-moss bg-moss-soft text-moss' : 'border-line bg-card text-ink'}`}
                 >
                   Todo mês
                 </button>
@@ -1012,7 +1012,7 @@ export function IncomeDialog({ onClose }: { onClose: () => void }) {
                   type="button"
                   aria-pressed={repeat === 'once'}
                   onClick={() => setRepeat('once')}
-                  className={`h-10 rounded-xl border text-sm font-medium ${repeat === 'once' ? 'border-moss bg-[#e5f2eb] text-moss' : 'border-line bg-white text-ink'}`}
+                  className={`h-10 rounded-xl border text-sm font-medium ${repeat === 'once' ? 'border-moss bg-moss-soft text-moss' : 'border-line bg-card text-ink'}`}
                 >
                   Só nesta data
                 </button>
@@ -1242,7 +1242,7 @@ export function CompanyDialog({ entry, onClose }: { entry: CompanyEntry | null; 
                 type="button"
                 aria-pressed={direction === 'entrada'}
                 onClick={() => setDirection('entrada')}
-                className={`h-10 rounded-xl border text-sm font-medium ${direction === 'entrada' ? 'border-moss bg-[#e5f2eb] text-moss' : 'border-line bg-white'}`}
+                className={`h-10 rounded-xl border text-sm font-medium ${direction === 'entrada' ? 'border-moss bg-moss-soft text-moss' : 'border-line bg-card'}`}
               >
                 Entrada
               </button>
@@ -1250,7 +1250,7 @@ export function CompanyDialog({ entry, onClose }: { entry: CompanyEntry | null; 
                 type="button"
                 aria-pressed={direction === 'saida'}
                 onClick={() => setDirection('saida')}
-                className={`h-10 rounded-xl border text-sm font-medium ${direction === 'saida' ? 'border-clay bg-[#f8e6e3] text-clay' : 'border-line bg-white'}`}
+                className={`h-10 rounded-xl border text-sm font-medium ${direction === 'saida' ? 'border-clay bg-clay-soft text-clay' : 'border-line bg-card'}`}
               >
                 Saída
               </button>

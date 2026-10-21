@@ -10,7 +10,7 @@ import { OverduePage } from './pages/OverduePage.tsx'
 import { PlansPage, SavingsPage } from './pages/CouplePages.tsx'
 import { FuelPage, GroceryPage, LeisurePage } from './pages/SpendingPages.tsx'
 import { HouseGate } from './auth.tsx'
-import { CoupleMark } from './components/Brand.tsx'
+import { CoupleMark, ThemeToggle } from './components/Brand.tsx'
 import { signOut } from './lib/cloud.ts'
 import { StoreProvider, useStore, type Page } from './state.tsx'
 
@@ -62,9 +62,9 @@ function Shell() {
 
   return (
     <div className="min-h-screen bg-paper text-ink md:grid md:grid-cols-[272px_1fr]">
-      <aside className="hidden md:flex md:flex-col md:bg-ink md:text-white">
+      <aside className="hidden md:flex md:flex-col md:bg-night md:text-white">
         <div className="px-5 pt-7 pb-6">
-          <CoupleMark tone="light" />
+          <CoupleMark tone="light" size="hero" />
         </div>
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3">
           {NAV.map((item) => {
@@ -106,11 +106,11 @@ function Shell() {
               <CoupleMark size="compact" />
             </div>
             <div className="flex items-center gap-1">
-              <button type="button" aria-label="Mês anterior" onClick={() => setMonth(shiftMonth(month, -1))} className="grid h-9 w-9 place-items-center rounded-full hover:bg-white">
+              <button type="button" aria-label="Mês anterior" onClick={() => setMonth(shiftMonth(month, -1))} className="grid h-9 w-9 place-items-center rounded-full hover:bg-card">
                 <Chevron />
               </button>
               <p className="min-w-40 text-center text-sm font-medium">{monthTitle(month)}</p>
-              <button type="button" aria-label="Próximo mês" onClick={() => setMonth(shiftMonth(month, 1))} className="grid h-9 w-9 place-items-center rounded-full hover:bg-white">
+              <button type="button" aria-label="Próximo mês" onClick={() => setMonth(shiftMonth(month, 1))} className="grid h-9 w-9 place-items-center rounded-full hover:bg-card">
                 <Chevron direction="right" />
               </button>
               {month !== currentMonth ? (
@@ -119,9 +119,12 @@ function Shell() {
                 </button>
               ) : null}
             </div>
-            <button type="button" onClick={() => void signOut()} className="text-sm font-medium text-ink-soft hover:text-ink">
-              Sair
-            </button>
+            <div className="flex items-center gap-3">
+              <ThemeToggle />
+              <button type="button" onClick={() => void signOut()} className="text-sm font-medium text-ink-soft hover:text-ink">
+                Sair
+              </button>
+            </div>
           </div>
         </header>
         <main className="px-4 py-6 pb-28 md:px-8 md:pb-10">
@@ -179,7 +182,7 @@ function Shell() {
       />
 
       {toast ? (
-        <div role="status" className="fixed top-20 left-1/2 z-[70] -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-sm text-white shadow-lg">
+        <div role="status" className="fixed top-20 left-1/2 z-[70] -translate-x-1/2 rounded-full bg-night px-4 py-2 text-sm text-white shadow-lg">
           {toast}
         </div>
       ) : null}

@@ -35,7 +35,7 @@ export function Modal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
-      <button type="button" className="absolute inset-0 bg-ink/45" aria-label="Fechar" onClick={onClose} />
+      <button type="button" className="absolute inset-0 bg-night/60" aria-label="Fechar" onClick={onClose} />
       <div
         role="dialog"
         aria-modal="true"

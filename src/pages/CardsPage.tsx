@@ -52,7 +52,7 @@ export function CardsPage() {
                     <p className="text-sm text-ink-soft">Fecha {formatShort(invoice.closing)}</p>
                     <p className="font-serif text-2xl tabular-nums">{formatBRL(invoice.total)}</p>
                   </div>
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#e7e1d4]">
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-track">
                     <div className={`h-full rounded-full ${card.limit > 0 && used > card.limit ? 'bg-clay' : 'bg-moss'}`} style={{ width: `${card.limit > 0 ? ratio * 100 : 0}%` }} />
                   </div>
                   <p className="mt-2 text-xs text-ink-soft">

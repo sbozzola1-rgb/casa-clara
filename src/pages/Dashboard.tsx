@@ -85,7 +85,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      <section className="mt-6 rounded-3xl bg-ink px-6 py-6 text-white md:px-8">
+      <section className="mt-6 rounded-3xl bg-night px-6 py-6 text-white md:px-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold tracking-[0.16em] text-white/60 uppercase">
@@ -132,7 +132,7 @@ export function Dashboard() {
       </Panel>
 
       {late.length > 0 ? (
-        <button type="button" onClick={() => setPage({ id: 'overdue' })} className="mt-4 flex w-full items-center justify-between gap-4 rounded-2xl bg-[#f8e6e3] px-5 py-4 text-left">
+        <button type="button" onClick={() => setPage({ id: 'overdue' })} className="mt-4 flex w-full items-center justify-between gap-4 rounded-2xl bg-clay-soft px-5 py-4 text-left">
           <span>
             <span className="block text-sm font-medium text-clay">{late.length} vencida{late.length === 1 ? '' : 's'}</span>
             <span className="mt-1 block text-sm text-clay/80">Gestão do que já passou do dia e ainda está em aberto.</span>
@@ -142,7 +142,7 @@ export function Dashboard() {
       ) : null}
 
       {leisureOver || groceryOver || fuelOver ? (
-        <div className="mt-4 rounded-2xl border border-[#e7c4b8] bg-[#f8e6e3] px-5 py-4 text-sm leading-relaxed text-clay">
+        <div className="mt-4 rounded-2xl border border-clay/40 bg-clay-soft px-5 py-4 text-sm leading-relaxed text-clay">
           {leisureOver ? <p>O lazer desta semana passou do teto em {formatBRL(leisure.total - (state.goals.leisureWeeklyMax ?? 0))}.</p> : null}
           {groceryOver ? <p>O mercado de {monthTitle(month).split(' de ')[0].toLowerCase()} passou da meta em {formatBRL(grocery.total - (goal.amount ?? 0))}.</p> : null}
           {fuelOver ? <p>O combustível de {monthTitle(month).split(' de ')[0].toLowerCase()} passou da meta em {formatBRL(fuelSpent.total - (fuel.amount ?? 0))}.</p> : null}
@@ -276,7 +276,7 @@ export function Dashboard() {
                         {card.limit > 0 ? ` · ${formatBRL(Math.max(0, round2(card.limit - used)))} livres` : ''}
                       </span>
                       {card.limit > 0 ? (
-                        <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-[#e7e1d4]">
+                        <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-track">
                           <span className={`block h-full rounded-full ${used > card.limit ? 'bg-clay' : 'bg-moss'}`} style={{ width: `${ratio * 100}%` }} />
                         </span>
                       ) : null}
@@ -300,7 +300,7 @@ export function Dashboard() {
                   <span>{slice.label}</span>
                   <span className="tabular-nums">{formatBRL(slice.amount)}</span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-[#e7e1d4]">
+                <div className="h-2 overflow-hidden rounded-full bg-track">
                   <div className="h-full rounded-full bg-moss" style={{ width: `${(slice.amount / peak) * 100}%` }} />
                 </div>
               </li>
