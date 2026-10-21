@@ -59,6 +59,16 @@ export function stopAlarmSound() {
   timer = null
 }
 
+export function playFinish() {
+  try {
+    tone(523, 0, 0.18, 0.06)
+    tone(659, 0.16, 0.2, 0.06)
+    tone(784, 0.34, 0.28, 0.07)
+  } catch {
+    /* sem som */
+  }
+}
+
 export async function notifyDevice(title: string, body: string, tag: string) {
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
   const icon = `${import.meta.env.BASE_URL}rotina-icon.svg`

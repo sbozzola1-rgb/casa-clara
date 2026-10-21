@@ -4,7 +4,7 @@ import { leaveRoutine, pinRoutine, routinePinned } from './door.ts'
 import { dateKey, defaultAvatar, formatLong, TABS, type AvatarLook } from './model.ts'
 import './routine.css'
 import { RoutineScheduler } from './scheduler.tsx'
-import { ActivityScreen, GradeScreen, HomeworkScreen, MealScreen, PixScreen, SchoolScreen, TodayScreen } from './screens.tsx'
+import { ActivityScreen, ActivityTimer, GradeScreen, HomeworkScreen, MealScreen, PixScreen, SchoolScreen, TodayScreen } from './screens.tsx'
 import { askNotificationPermission } from './sound.ts'
 import { RoutineProvider, useRoutine } from './store.tsx'
 import { Field, Modal, PinPad, TextInput } from './ui.tsx'
@@ -152,6 +152,7 @@ function Shell({ onLeave }: { onLeave: () => void }) {
       </nav>
 
       <RoutineScheduler />
+      <ActivityTimer />
       {gate ? (
         <PinGate
           mode={gate}

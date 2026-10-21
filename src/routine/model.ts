@@ -59,6 +59,7 @@ export type ActivityItem = {
   days: number[]
   time: string
   notify: boolean
+  timerMinutes: number
   pixEnabled: boolean
   pixAmount: number
   pixNote: string
@@ -521,6 +522,7 @@ export function sanitize(input: unknown): RoutineState {
           days: days(item.days, SCHOOL_DAYS),
           time: clock(item.time, '16:00'),
           notify: item.notify !== false,
+          timerMinutes: Math.min(180, Math.max(0, Math.round(amount(item.timerMinutes)))),
           pixEnabled: item.pixEnabled === true,
           pixAmount: amount(item.pixAmount),
           pixNote: text(item.pixNote).trim().slice(0, 80),

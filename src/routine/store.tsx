@@ -50,6 +50,9 @@ interface RoutineStore {
   markRung: (key: string) => void
   markNotified: (key: string) => void
   replaceState: (input: unknown) => void
+  timer: ActivityItem | null
+  playTimer: (item: ActivityItem) => void
+  closeTimer: () => void
 }
 
 const RoutineContext = createContext<RoutineStore | null>(null)
@@ -64,6 +67,7 @@ export function RoutineProvider({ children }: { children: ReactNode }) {
   const [tab, setTab] = useState<TabId>('hoje')
   const [toast, setToast] = useState<string | null>(null)
   const [today] = useState(() => new Date())
+  const [timer, setTimer] = useState<ActivityItem | null>(null)
 
   useEffect(() => {
     saveRoutine(state)
@@ -159,12 +163,17 @@ export function RoutineProvider({ children }: { children: ReactNode }) {
     },
     markRung: (key) => patch((current) => (current.rung[key] ? current : { ...current, rung: { ...current.rung, [key]: true } })),
     markNotified: (key) => patch((current) => (current.notified[key] ? current : { ...current, notified: { ...current.notified, [key]: true } })),
+    timer,
+    playTimer: (item) => {
+      if (item.timerMinutes > 0) setTimer(item)
+    },
+    closeTimer: () => setTimer(null),
     replaceState: (input) => {
       const next = sanitize(input)
       if (!next.profile) throw new Error('arquivo')
       setState(next)
     },
-  }), [notify, patch, replaceList, role, state, tab, toast, today])
+  }), [notify, patch, replaceList, role, state, tab, timer, toast, today])
 
   return <RoutineContext.Provider value={value}>{children}</RoutineContext.Provider>
 }

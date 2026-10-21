@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
   activityOccurs,
   ALL_DAYS,
@@ -28,7 +28,7 @@ import {
   type MealItem,
   type SchoolItem,
 } from './model.ts'
-import { askNotificationPermission, playPop } from './sound.ts'
+import { askNotificationPermission, playFinish, playPop } from './sound.ts'
 import { useRoutine } from './store.tsx'
 import { DayField, EmptyState, EmojiField, Field, FormModal, ItemCard, Modal, TextInput, ToggleRow } from './ui.tsx'
 
@@ -89,6 +89,102 @@ function useCheck() {
 function atDate(iso: string) {
   const [year, month, day] = iso.split('-').map(Number)
   return new Date(year, (month ?? 1) - 1, day ?? 1)
+}
+
+function TimerPlay({ item }: { item: ActivityItem }) {
+  const { playTimer } = useRoutine()
+  if (item.timerMinutes <= 0) return null
+  return (
+    <button type="button" className="btn-soft mt-2" onClick={() => playTimer(item)}>
+      Play · {item.timerMinutes} min
+    </button>
+  )
+}
+
+export function ActivityTimer() {
+  const { timer, closeTimer } = useRoutine()
+  const total = (timer?.timerMinutes ?? 0) * 60
+  const [left, setLeft] = useState(total)
+  const [paused, setPaused] = useState(false)
+  const endsAt = useRef(0)
+  const finished = useRef(false)
+
+  useEffect(() => {
+    if (!timer) return
+    finished.current = false
+    setPaused(false)
+    setLeft(timer.timerMinutes * 60)
+    endsAt.current = Date.now() + timer.timerMinutes * 60 * 1000
+  }, [timer])
+
+  useEffect(() => {
+    if (!timer || paused) return
+    const tick = () => setLeft(Math.max(0, Math.round((endsAt.current - Date.now()) / 1000)))
+    tick()
+    const id = window.setInterval(tick, 250)
+    return () => window.clearInterval(id)
+  }, [paused, timer])
+
+  useEffect(() => {
+    if (!timer || left > 0 || finished.current) return
+    finished.current = true
+    playFinish()
+  }, [left, timer])
+
+  useEffect(() => {
+    if (!timer) return
+    let gone = false
+    let lock: { release: () => Promise<void> } | null = null
+    const wakeLock = (navigator as Navigator & { wakeLock?: { request: (type: 'screen') => Promise<{ release: () => Promise<void> }> } }).wakeLock
+    void wakeLock?.request('screen').then((sentinel) => {
+      if (gone) void sentinel.release()
+      else lock = sentinel
+    }).catch(() => undefined)
+    return () => {
+      gone = true
+      void lock?.release()
+    }
+  }, [timer])
+
+  if (!timer) return null
+  const minutes = Math.floor(left / 60)
+  const seconds = String(left % 60).padStart(2, '0')
+  const done = left <= 0
+  const ratio = total === 0 ? 0 : left / total
+
+  return (
+    <div className="routine-root fixed inset-0 z-[80] grid place-items-center bg-[#2a1438]/80 px-6">
+      <div className="card w-full max-w-md px-6 py-8 text-center">
+        <p className="text-5xl">{timer.emoji}</p>
+        <h2 className="font-display mt-2 text-3xl">{timer.title}</h2>
+        <div className="mx-auto mt-6 grid h-52 w-52 place-items-center rounded-full" style={{ background: `conic-gradient(#e879f9 ${ratio * 360}deg, #fce7f3 0deg)` }}>
+          <div className="grid h-40 w-40 place-items-center rounded-full bg-white">
+            <p className="font-display text-6xl">{done ? '00:00' : `${minutes}:${seconds}`}</p>
+          </div>
+        </div>
+        <p className="mt-4 text-lg font-extrabold">{done ? 'Acabou o tempo!' : paused ? 'Pausado' : `${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}`}</p>
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          {done ? null : (
+            <button
+              type="button"
+              className="btn-soft"
+              onClick={() => {
+                if (paused) {
+                  endsAt.current = Date.now() + left * 1000
+                  setPaused(false)
+                } else setPaused(true)
+              }}
+            >
+              {paused ? 'Continuar' : 'Pausar'}
+            </button>
+          )}
+          <button type="button" className="btn-primary" onClick={closeTimer}>
+            {done ? 'Terminei' : 'Fechar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function CreateAlarmButton({ kind }: { kind: 'activity' | 'meal' | 'homework' }) {
@@ -209,17 +305,21 @@ export function TodayScreen() {
   const exam = routine.some((item) => item.title.toLocaleLowerCase('pt-BR').includes('avalia'))
   const joke = dailyJoke(today)
   const profile = state.profile
-  const card = (task: (typeof all)[number]) => (
-    <ItemCard
-      key={`${task.kind}-${task.id}`}
-      emoji={task.emoji}
-      title={task.title}
-      meta={[task.time, task.kind === 'meal' ? 'Refeição' : task.kind === 'homework' ? 'Lição' : 'Atividade', task.pix ? 'Tem Pix' : ''].filter(Boolean).join(' · ')}
-      done={task.done}
-      canToggle
-      onToggle={() => check(task.kind, task.id, task.done)}
-    />
-  )
+  const card = (task: (typeof all)[number]) => {
+    const activity = task.kind === 'activity' ? state.activities.find((item) => item.id === task.id) : undefined
+    return (
+      <ItemCard
+        key={`${task.kind}-${task.id}`}
+        emoji={task.emoji}
+        title={task.title}
+        meta={[task.time, task.kind === 'meal' ? 'Refeição' : task.kind === 'homework' ? 'Lição' : 'Atividade', task.pix ? 'Tem Pix' : '', activity && activity.timerMinutes > 0 ? `${activity.timerMinutes} min` : ''].filter(Boolean).join(' · ')}
+        done={task.done}
+        canToggle
+        onToggle={() => check(task.kind, task.id, task.done)}
+        extra={activity ? <TimerPlay item={activity} /> : null}
+      />
+    )
+  }
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -613,6 +713,7 @@ export function ActivityScreen() {
       note: draft.note.trim(),
       pixNote: draft.pixNote.trim(),
       pixAmount: draft.pixEnabled ? draft.pixAmount : 0,
+      timerMinutes: draft.timerMinutes > 0 ? Math.min(180, Math.max(1, Math.round(draft.timerMinutes))) : 0,
     })
     if (draft.notify) void askNotificationPermission()
     setDraft(null)
@@ -623,7 +724,7 @@ export function ActivityScreen() {
       <PageHeader
         title="Atividades"
         text={role === 'parent' ? 'Diária ou semanal. No horário, o tablet avisa. O Pix, se existir, só você marca.' : 'Marque como feito quando terminar.'}
-        action={<div className="flex flex-wrap gap-2">{role === 'parent' ? <AddButton label="Nova atividade" onClick={() => { setError(''); setDraft({ id: uid(), title: '', emoji: '⭐', note: '', frequency: 'daily', days: SCHOOL_DAYS, time: '16:00', notify: true, pixEnabled: false, pixAmount: 5, pixNote: '' }) }} /> : null}<CreateAlarmButton kind="activity" /></div>}
+        action={<div className="flex flex-wrap gap-2">{role === 'parent' ? <AddButton label="Nova atividade" onClick={() => { setError(''); setDraft({ id: uid(), title: '', emoji: '⭐', note: '', frequency: 'daily', days: SCHOOL_DAYS, time: '16:00', notify: true, timerMinutes: 0, pixEnabled: false, pixAmount: 5, pixNote: '' }) }} /> : null}<CreateAlarmButton kind="activity" /></div>}
       />
       {visible.length === 0 ? (
         <EmptyState emoji="⭐" title="Nenhuma atividade" text={role === 'parent' ? 'Crie a primeira atividade do dia ou da semana.' : 'Hoje não tem atividade.'} />
@@ -637,13 +738,18 @@ export function ActivityScreen() {
                 key={item.id}
                 emoji={item.emoji}
                 title={item.title}
-                meta={`${frequencyLabel(item)} · ${item.time}${item.notify ? ' · avisa' : ''}${item.pixEnabled ? ` · Pix ${money(item.pixAmount)}` : ''}`}
+                meta={`${frequencyLabel(item)} · ${item.time}${item.timerMinutes > 0 ? ` · timer ${item.timerMinutes} min` : ''}${item.notify ? ' · avisa' : ''}${item.pixEnabled ? ` · Pix ${money(item.pixAmount)}` : ''}`}
                 done={happens ? done : undefined}
                 canToggle={happens}
                 onToggle={() => check('activity', item.id, done)}
                 onEdit={role === 'parent' ? () => { setError(''); setDraft(item) } : undefined}
                 onDelete={role === 'parent' ? () => setRemoveId(item.id) : undefined}
-                extra={item.note ? <p className="mt-1 text-sm">{item.note}</p> : null}
+                extra={
+                  <>
+                    {item.note ? <p className="mt-1 text-sm">{item.note}</p> : null}
+                    <TimerPlay item={item} />
+                  </>
+                }
               />
             )
           })}
@@ -674,6 +780,12 @@ export function ActivityScreen() {
             <TextInput type="time" value={draft.time} onChange={(event) => setDraft({ ...draft, time: event.target.value })} />
           </Field>
           <ToggleRow label="Avisar no tablet neste horário" checked={draft.notify} onChange={(notify) => setDraft({ ...draft, notify })} />
+          <ToggleRow label="Tem timer" hint="Ela dá play e os minutos contam de trás para frente." checked={draft.timerMinutes > 0} onChange={(on) => setDraft({ ...draft, timerMinutes: on ? Math.max(draft.timerMinutes, 10) : 0 })} />
+          {draft.timerMinutes > 0 ? (
+            <Field label="Minutos">
+              <TextInput inputMode="numeric" value={String(draft.timerMinutes)} onChange={(event) => setDraft({ ...draft, timerMinutes: Number(event.target.value.replace(/\D/g, '')) || 0 })} />
+            </Field>
+          ) : null}
           <ToggleRow label="Essa atividade tem Pix recompensa?" hint="Só você marca o Pix como feito." checked={draft.pixEnabled} onChange={(pixEnabled) => setDraft({ ...draft, pixEnabled })} />
           {draft.pixEnabled ? (
             <>
