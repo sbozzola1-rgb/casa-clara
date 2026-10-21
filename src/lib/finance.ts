@@ -42,6 +42,16 @@ export function fixedKey(expenseId: string, month: string): string {
   return `${expenseId}:${month}`
 }
 
+export function fixedCardPurchaseId(expenseId: string, month: string): string {
+  return `fixed:${expenseId}:${month}`
+}
+
+export function fixedPaymentFromPurchase(id: string): { expenseId: string; month: string } | null {
+  const match = /^fixed:([^:]+):(\d{4}-\d{2})$/.exec(id)
+  if (!match) return null
+  return { expenseId: match[1], month: match[2] }
+}
+
 export function invoiceMonthFor(date: Date, closingDay: number): { year: number; monthIndex: number } {
   const closing = dateOn(date.getFullYear(), date.getMonth(), closingDay)
   if (date.getDate() <= closing.getDate()) {
@@ -293,6 +303,16 @@ export interface OverdueItem {
   monthIndex?: number
 }
 
+export function fixedApplies(expense: { active: boolean; startDate?: string | null }, month: string): boolean {
+  if (!expense.active) return false
+  if (!expense.startDate || !/^\d{4}-\d{2}-\d{2}$/.test(expense.startDate)) return true
+  const when = parseDate(expense.startDate)
+  const { year, monthIndex } = parseMonthKey(month)
+  const start = when.getFullYear() * 12 + when.getMonth()
+  const target = year * 12 + monthIndex
+  return target >= start
+}
+
 export function overdueItems(state: AppState, today: Date): OverdueItem[] {
   const todayStart = startOfDay(today).getTime()
   const items: OverdueItem[] = []
@@ -301,7 +321,7 @@ export function overdueItems(state: AppState, today: Date): OverdueItem[] {
     const key = monthKey(ref)
     const { year, monthIndex } = parseMonthKey(key)
     for (const expense of state.fixedExpenses) {
-      if (!expense.active || expense.amount <= 0 || state.paidFixed[fixedKey(expense.id, key)]) continue
+      if (!fixedApplies(expense, key) || expense.amount <= 0 || state.paidFixed[fixedKey(expense.id, key)]) continue
       const due = dateOn(year, monthIndex, expense.dueDay)
       if (startOfDay(due).getTime() >= todayStart) continue
       items.push({
@@ -341,7 +361,7 @@ export function attentionCount(state: AppState, today: Date): number {
 }
 
 export function monthReport(state: AppState, month: string): MonthReport {
-  const active = state.fixedExpenses.filter((expense) => expense.active)
+  const active = state.fixedExpenses.filter((expense) => fixedApplies(expense, month))
   const fixedTotal = round2(active.reduce((sum, expense) => sum + expense.amount, 0))
   const fixedPaid = round2(
     active.reduce((sum, expense) => sum + (state.paidFixed[fixedKey(expense.id, month)] ? expense.amount : 0), 0),
@@ -355,7 +375,13 @@ export function monthReport(state: AppState, month: string): MonthReport {
       .filter((expense) => !expense.inflowId && inRange(parseDate(expense.date), start, end))
       .reduce((sum, expense) => sum + expense.amount, 0),
   )
-  const outflow = round2(fixedTotal + invoiceTotal + cashTotal)
+  const onCard = round2(
+    active.reduce(
+      (sum, expense) => sum + (state.purchases.some((item) => item.id === fixedCardPurchaseId(expense.id, month)) ? expense.amount : 0),
+      0,
+    ),
+  )
+  const outflow = round2(fixedTotal - onCard + invoiceTotal + cashTotal)
   return {
     fixedTotal,
     fixedPaid,

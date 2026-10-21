@@ -150,6 +150,7 @@ export function sanitize(input: unknown): AppState | null {
               name: text(item.name).trim() || 'Gasto fixo',
               amount: numberOrNull(item.amount) ?? 0,
               dueDay: Math.min(31, Math.max(1, Math.round(Number(item.dueDay)) || 1)),
+              startDate: /^\d{4}-\d{2}-\d{2}$/.test(text(item.startDate)) ? text(item.startDate) : null,
               category,
               icon: (fixedIconIds.has(icon) ? icon : iconForCategory(category)) as FixedIconId,
               notes: text(item.notes),

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { formatShort, parseDate, parseDay, todayISO } from '../lib/dates.ts'
+import { formatShort, monthTitle, parseDate, parseDay, todayISO } from '../lib/dates.ts'
 import { ExpenseIcon } from './ExpenseIcon.tsx'
 import { groceryInflowApplies, installmentSchedule } from '../lib/finance.ts'
 import { formatBRL, formatInput, parseMoney, uid } from '../lib/money.ts'
@@ -97,6 +97,7 @@ export function FixedDialog({ expense, onClose }: { expense: FixedExpense | null
   const [name, setName] = useState(expense?.name ?? '')
   const [amount, setAmount] = useState(expense ? formatInput(expense.amount) : '')
   const [dueDay, setDueDay] = useState(String(expense?.dueDay ?? 5))
+  const [startDate, setStartDate] = useState(expense ? (expense.startDate ?? '') : todayISO())
   const [category, setCategory] = useState(expense?.category ?? 'Aluguel')
   const [icon, setIcon] = useState<FixedIconId>(expense?.icon ?? iconForCategory(expense?.category ?? 'Aluguel'))
   const [iconChosen, setIconChosen] = useState(Boolean(expense))
@@ -123,11 +124,16 @@ export function FixedDialog({ expense, onClose }: { expense: FixedExpense | null
       setError('O vencimento fica entre os dias 1 e 31.')
       return
     }
+    if (startDate && !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+      setError('Informe a data inicial.')
+      return
+    }
     upsertFixed({
       id: expense?.id ?? uid(),
       name: name.trim(),
       amount: parsedAmount,
       dueDay: day,
+      startDate: startDate || null,
       category,
       icon,
       notes: notes.trim(),
@@ -171,6 +177,9 @@ export function FixedDialog({ expense, onClose }: { expense: FixedExpense | null
             <input autoFocus className={fieldClass} value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Aluguel" />
           </Field>
           <MoneyField label="Valor mensal" value={amount} onChange={setAmount} />
+          <Field label="Data inicial" hint="Entra a partir desse mês. Em branco, vale desde sempre.">
+            <input type="date" className={fieldClass} value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+          </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Dia do vencimento" hint="Se o mês não tiver esse dia, vale o último.">
               <input className={fieldClass} inputMode="numeric" value={dueDay} onChange={(event) => setDueDay(event.target.value)} />
@@ -218,7 +227,7 @@ export function FixedDialog({ expense, onClose }: { expense: FixedExpense | null
           </Field>
           <label className="flex items-center gap-3 text-sm">
             <input type="checkbox" className="h-4 w-4 accent-moss" checked={active} onChange={(event) => setActive(event.target.checked)} />
-            Entra na conta deste mês
+            Entra na conta
           </label>
           {error ? <p className="text-sm text-clay">{error}</p> : null}
         </form>
@@ -226,7 +235,7 @@ export function FixedDialog({ expense, onClose }: { expense: FixedExpense | null
       {confirming && expense ? (
         <ConfirmDialog
           title="Excluir gasto fixo"
-          text={`“${expense.name}” sai da lista. Os meses já marcados como pagos também saem.`}
+          text={`“${expense.name}” sai da lista. Os meses já marcados como pagos também saem, inclusive o que foi lançado num cartão.`}
           confirmLabel="Excluir"
           onClose={() => setConfirming(false)}
           onConfirm={() => {
@@ -236,6 +245,71 @@ export function FixedDialog({ expense, onClose }: { expense: FixedExpense | null
         />
       ) : null}
     </>
+  )
+}
+
+export function PayFixedDialog({ expense, month, onClose }: { expense: FixedExpense; month: string; onClose: () => void }) {
+  const { state, payFixed } = useStore()
+  const [cardId, setCardId] = useState('')
+  const [error, setError] = useState('')
+
+  const payOnCard = () => {
+    if (!cardId) {
+      setError('Escolha o cartão.')
+      return
+    }
+    payFixed(expense.id, month, cardId)
+    onClose()
+  }
+
+  return (
+    <Modal
+      title={`Pagar ${expense.name}`}
+      description={`${monthTitle(month)} · ${formatBRL(expense.amount)}`}
+      onClose={onClose}
+      footer={
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                payFixed(expense.id, month, null)
+                onClose()
+              }}
+            >
+              Saiu da conta
+            </Button>
+            <Button onClick={payOnCard} disabled={state.cards.length === 0}>
+              Lançar no cartão
+            </Button>
+          </div>
+        </div>
+      }
+    >
+      <form
+        className="space-y-4 pb-2"
+        onSubmit={(event) => {
+          event.preventDefault()
+          payOnCard()
+        }}
+      >
+        <Field label="Cartão" hint="O valor entra na fatura desse cartão e deixa de sair de novo da conta neste mês.">
+          <select className={fieldClass} value={cardId} onChange={(event) => setCardId(event.target.value)}>
+            <option value="">Escolha o cartão</option>
+            {state.cards.map((card) => (
+              <option key={card.id} value={card.id}>
+                {card.nickname}
+                {card.lastFour ? ` · ${card.lastFour}` : ''}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {error ? <p className="text-sm text-clay">{error}</p> : null}
+      </form>
+    </Modal>
   )
 }
 

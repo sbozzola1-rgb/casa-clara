@@ -1,19 +1,21 @@
 import { useState } from 'react'
-import { FixedDialog } from '../components/dialogs.tsx'
+import { FixedDialog, PayFixedDialog } from '../components/dialogs.tsx'
 import { ExpenseMark } from '../components/ExpenseIcon.tsx'
 import { Button, EmptyState, PageIntro, ToneBadge, toneLabel } from '../components/ui.tsx'
-import { dateOn, dueTone, formatShort, parseMonthKey } from '../lib/dates.ts'
-import { fixedKey, monthReport } from '../lib/finance.ts'
+import { dateOn, dueTone, formatShort, parseDate, parseMonthKey } from '../lib/dates.ts'
+import { fixedApplies, fixedCardPurchaseId, fixedKey, monthReport } from '../lib/finance.ts'
 import { formatBRL } from '../lib/money.ts'
 import type { FixedExpense } from '../lib/types.ts'
 import { useStore } from '../state.tsx'
 
 export function FixedPage() {
-  const { state, month, today, toggleFixedPaid } = useStore()
+  const { state, month, today, payFixed, unpayFixed } = useStore()
   const [editing, setEditing] = useState<FixedExpense | null | 'new'>(null)
+  const [paying, setPaying] = useState<FixedExpense | null>(null)
   const { year, monthIndex } = parseMonthKey(month)
   const report = monthReport(state, month)
-  const active = [...state.fixedExpenses.filter((expense) => expense.active)].sort((a, b) => a.dueDay - b.dueDay || a.name.localeCompare(b.name))
+  const active = [...state.fixedExpenses.filter((expense) => fixedApplies(expense, month))].sort((a, b) => a.dueDay - b.dueDay || a.name.localeCompare(b.name))
+  const upcoming = state.fixedExpenses.filter((expense) => expense.active && !fixedApplies(expense, month))
   const inactive = state.fixedExpenses.filter((expense) => !expense.active)
 
   return (
@@ -21,7 +23,7 @@ export function FixedPage() {
       <PageIntro
         eyebrow="Todo mês"
         title="Gastos fixos"
-        description="O que se repete independente do mercado e do lazer. Marque como pago quando o dinheiro sair da conta."
+        description="O que se repete independente do mercado e do lazer. Marque como pago quando sair da conta ou for para um cartão."
         action={<Button onClick={() => setEditing('new')}>Novo gasto</Button>}
       />
 
@@ -31,17 +33,19 @@ export function FixedPage() {
         <Summary label="Em aberto" value={formatBRL(report.fixedOpen)} />
       </div>
 
-      {active.length === 0 ? (
+      {active.length === 0 && upcoming.length === 0 ? (
         <EmptyState
           title="Nenhum gasto fixo"
           text="Comece pelo que não dá para esquecer: aluguel, condomínio, luz, água, internet, escola."
           action={<Button onClick={() => setEditing('new')}>Cadastrar o primeiro</Button>}
         />
-      ) : (
+      ) : active.length > 0 ? (
         <ul className="overflow-hidden rounded-2xl border border-line bg-card">
           {active.map((expense) => {
             const due = dateOn(year, monthIndex, expense.dueDay)
             const paid = Boolean(state.paidFixed[fixedKey(expense.id, month)])
+            const cardPaid = state.purchases.find((item) => item.id === fixedCardPurchaseId(expense.id, month))
+            const cardName = state.cards.find((item) => item.id === cardPaid?.cardId)?.nickname
             const tone = dueTone(due, today, paid)
             return (
               <li key={expense.id} className="flex items-center gap-3 border-b border-line px-4 py-4 last:border-b-0 md:px-5">
@@ -51,7 +55,11 @@ export function FixedPage() {
                     className="h-4 w-4 accent-moss"
                     checked={paid}
                     aria-label={`Marcar ${expense.name} como pago`}
-                    onChange={() => toggleFixedPaid(expense.id, month)}
+                    onChange={() => {
+                      if (paid) unpayFixed(expense.id, month)
+                      else if (state.cards.length === 0) payFixed(expense.id, month, null)
+                      else setPaying(expense)
+                    }}
                   />
                 </label>
                 <ExpenseMark name={expense.icon} />
@@ -62,6 +70,8 @@ export function FixedPage() {
                   </span>
                   <span className="mt-1 block text-xs text-ink-soft">
                     Vence {formatShort(due)} · {expense.category}
+                    {expense.startDate ? ` · desde ${formatShort(parseDate(expense.startDate))}` : ''}
+                    {cardName ? ` · no ${cardName}` : ''}
                     {expense.notes ? ` · ${expense.notes}` : ''}
                   </span>
                 </button>
@@ -70,7 +80,29 @@ export function FixedPage() {
             )
           })}
         </ul>
-      )}
+      ) : null}
+
+      {upcoming.length > 0 ? (
+        <section className="mt-8">
+          <h2 className="mb-3 text-sm font-medium text-ink-soft">Começam depois</h2>
+          <ul className="divide-y divide-line rounded-2xl border border-line bg-card">
+            {upcoming.map((expense) => (
+              <li key={expense.id}>
+                <button type="button" onClick={() => setEditing(expense)} className="flex w-full items-center gap-3 px-5 py-3 text-left">
+                  <ExpenseMark name={expense.icon} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium">{expense.name}</span>
+                    <span className="mt-1 block text-xs text-ink-soft">
+                      Desde {expense.startDate ? formatShort(parseDate(expense.startDate)) : 'o início'} · {expense.category}
+                    </span>
+                  </span>
+                  <span className="tabular-nums">{formatBRL(expense.amount)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {inactive.length > 0 ? (
         <section className="mt-8">
@@ -92,6 +124,7 @@ export function FixedPage() {
       {editing !== null ? (
         <FixedDialog expense={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />
       ) : null}
+      {paying ? <PayFixedDialog expense={paying} month={month} onClose={() => setPaying(null)} /> : null}
     </div>
   )
 }

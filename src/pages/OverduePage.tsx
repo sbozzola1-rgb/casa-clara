@@ -1,18 +1,27 @@
+import { useState } from 'react'
+import { PayFixedDialog } from '../components/dialogs.tsx'
 import { ExpenseMark } from '../components/ExpenseIcon.tsx'
 import { EmptyState, PageIntro, Panel } from '../components/ui.tsx'
 import { formatShort, monthKey, monthTitle } from '../lib/dates.ts'
 import { overdueItems, type OverdueItem } from '../lib/finance.ts'
 import { formatBRL, round2 } from '../lib/money.ts'
+import type { FixedExpense } from '../lib/types.ts'
 import { useStore } from '../state.tsx'
 
 export function OverduePage() {
-  const { state, today, toggleFixedPaid, toggleInvoicePaid } = useStore()
+  const { state, today, payFixed, toggleInvoicePaid } = useStore()
+  const [paying, setPaying] = useState<{ expense: FixedExpense; month: string } | null>(null)
   const items = overdueItems(state, today)
   const total = round2(items.reduce((sum, item) => sum + item.amount, 0))
   const groups = groupByMonth(items)
 
   const markPaid = (item: OverdueItem) => {
-    if (item.kind === 'fixed' && item.expenseId) toggleFixedPaid(item.expenseId, item.month)
+    if (item.kind === 'fixed' && item.expenseId) {
+      const expense = state.fixedExpenses.find((entry) => entry.id === item.expenseId)
+      if (!expense) return
+      if (state.cards.length === 0) payFixed(expense.id, item.month, null)
+      else setPaying({ expense, month: item.month })
+    }
     if (item.kind === 'invoice' && item.cardId != null && item.year != null && item.monthIndex != null) {
       toggleInvoicePaid(item.cardId, item.year, item.monthIndex)
     }
@@ -49,6 +58,7 @@ export function OverduePage() {
                       <input
                         type="checkbox"
                         className="h-4 w-4 accent-moss"
+                        checked={false}
                         aria-label={`Marcar ${item.title} de ${monthTitle(item.month)} como pago`}
                         onChange={() => markPaid(item)}
                       />
@@ -71,6 +81,7 @@ export function OverduePage() {
           </p>
         </div>
       )}
+      {paying ? <PayFixedDialog expense={paying.expense} month={paying.month} onClose={() => setPaying(null)} /> : null}
     </div>
   )
 }

@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { pullHousehold, pushHousehold, subscribeHousehold } from './lib/cloud.ts'
 import { uid } from './lib/money.ts'
-import { monthKey } from './lib/dates.ts'
+import { dateOn, formatISO, monthKey, parseMonthKey } from './lib/dates.ts'
+import { fixedCardPurchaseId, fixedKey, fixedPaymentFromPurchase } from './lib/finance.ts'
 import { loadState, sanitize, saveState } from './lib/storage.ts'
 import { emptyState, SPEND_CATEGORIES, type AppState, type CashExpense, type CompanyEntry, type CreditCard, type FixedExpense, type GroceryInflow, type IncomeSource, type LeisurePlan, type Purchase, type SavingPot, type SpendEntry } from './lib/types.ts'
 
@@ -9,7 +10,7 @@ export type Page =
   | { id: 'dashboard' }
   | { id: 'fixed' }
   | { id: 'cards' }
-  | { id: 'card'; cardId: string }
+  | { id: 'card'; cardId: string; dueMonth?: string }
   | { id: 'grocery'; compose?: boolean }
   | { id: 'leisure'; compose?: boolean }
   | { id: 'fuel'; compose?: boolean }
@@ -34,7 +35,8 @@ interface Store {
   removeCompany: (id: string) => void
   upsertFixed: (expense: FixedExpense) => void
   removeFixed: (id: string) => void
-  toggleFixedPaid: (id: string, month: string) => void
+  payFixed: (id: string, month: string, cardId: string | null) => void
+  unpayFixed: (id: string, month: string) => void
   upsertCard: (card: CreditCard) => void
   removeCard: (id: string) => void
   toggleInvoicePaid: (cardId: string, year: number, monthIndex: number) => void
@@ -198,6 +200,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           fixedExpenses: current.fixedExpenses.some((item) => item.id === expense.id)
             ? current.fixedExpenses.map((item) => (item.id === expense.id ? expense : item))
             : [...current.fixedExpenses, expense],
+          purchases: current.purchases.map((item) => {
+            const payment = fixedPaymentFromPurchase(item.id)
+            if (!payment || payment.expenseId !== expense.id) return item
+            const { year, monthIndex } = parseMonthKey(payment.month)
+            return {
+              ...item,
+              description: expense.name,
+              amount: expense.amount,
+              date: formatISO(dateOn(year, monthIndex, expense.dueDay)),
+            }
+          }),
         }))
         notify('Gasto fixo salvo')
       },
@@ -206,16 +219,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ...current,
           fixedExpenses: current.fixedExpenses.filter((item) => item.id !== id),
           paidFixed: Object.fromEntries(Object.entries(current.paidFixed).filter(([key]) => !key.startsWith(`${id}:`))),
+          purchases: current.purchases.filter((item) => fixedPaymentFromPurchase(item.id)?.expenseId !== id),
         }))
         notify('Gasto fixo removido')
       },
-      toggleFixedPaid: (id, targetMonth) => {
-        const key = `${id}:${targetMonth}`
+      payFixed: (id, targetMonth, cardId) => {
+        setState((current) => {
+          const expense = current.fixedExpenses.find((item) => item.id === id)
+          if (!expense) return current
+          const purchaseId = fixedCardPurchaseId(id, targetMonth)
+          const paidFixed = { ...current.paidFixed, [fixedKey(id, targetMonth)]: true as const }
+          const without = current.purchases.filter((item) => item.id !== purchaseId)
+          if (!cardId) return { ...current, paidFixed, purchases: without }
+          const { year, monthIndex } = parseMonthKey(targetMonth)
+          const purchase: Purchase = {
+            id: purchaseId,
+            cardId,
+            description: expense.name,
+            amount: expense.amount,
+            installments: 1,
+            date: formatISO(dateOn(year, monthIndex, expense.dueDay)),
+            category: 'outro',
+          }
+          return { ...current, paidFixed, purchases: [...without, purchase] }
+        })
+      },
+      unpayFixed: (id, targetMonth) => {
         setState((current) => {
           const paidFixed = { ...current.paidFixed }
-          if (paidFixed[key]) delete paidFixed[key]
-          else paidFixed[key] = true
-          return { ...current, paidFixed }
+          delete paidFixed[fixedKey(id, targetMonth)]
+          return {
+            ...current,
+            paidFixed,
+            purchases: current.purchases.filter((item) => item.id !== fixedCardPurchaseId(id, targetMonth)),
+          }
         })
       },
       upsertCard: (card) => {
@@ -255,10 +292,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         notify('Compra salva')
       },
       removePurchase: (id) => {
-        setState((current) => ({
-          ...current,
-          purchases: current.purchases.filter((item) => item.id !== id),
-        }))
+        setState((current) => {
+          const payment = fixedPaymentFromPurchase(id)
+          const paidFixed = { ...current.paidFixed }
+          if (payment) delete paidFixed[fixedKey(payment.expenseId, payment.month)]
+          return {
+            ...current,
+            paidFixed,
+            purchases: current.purchases.filter((item) => item.id !== id),
+          }
+        })
         notify('Compra removida')
       },
       saveSpend: (previous, next) => {

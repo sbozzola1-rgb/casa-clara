@@ -108,6 +108,28 @@ assert(monthFlow(dated, '2026-10').people.vinicius === 1000 && monthFlow(dated, 
 assert(monthFlow(dated, '2026-11').people.sara === 300 && monthFlow(dated, '2026-11').people.vinicius === 1000, 'extra entra só em novembro e o salário continua')
 assert(october.expense === 2500, 'saída da empresa soma nos gastos da casa')
 
+const school = {
+  ...emptyState(),
+  fixedExpenses: [{ id: 'escola', name: 'Escola', amount: 800, dueDay: 5, startDate: '2026-11-01', category: 'Escola', icon: 'escola' as const, notes: '', active: true }],
+}
+assert(monthReport(school, '2026-10').fixedTotal === 0, 'fixo não entra antes da data inicial')
+assert(monthReport(school, '2026-11').fixedTotal === 800, 'fixo entra no mês da data inicial')
+const schoolLate = overdueItems(school, parseDate('2026-12-20'))
+assert(!schoolLate.some((item) => item.month === '2026-10'), 'fixo não fica vencido antes de começar')
+assert(schoolLate.some((item) => item.month === '2026-11' && item.expenseId === 'escola'), 'fixo vencido conta a partir do mês inicial')
+
+const rentOnCard = {
+  ...emptyState(),
+  cards: [card],
+  fixedExpenses: [{ id: 'aluguel', name: 'Aluguel', amount: 800, dueDay: 10, startDate: null, category: 'Aluguel', icon: 'casa' as const, notes: '', active: true }],
+  paidFixed: { 'aluguel:2026-10': true as const },
+  purchases: [{ id: 'fixed:aluguel:2026-10', cardId: 'card-1', description: 'Aluguel', amount: 800, installments: 1, date: '2026-10-10', category: 'outro' }],
+}
+assert(monthReport(rentOnCard, '2026-10').fixedPaid === 800, 'fixo no cartão continua pago na lista')
+assert(monthFlow(rentOnCard, '2026-10').expense === 0, 'fixo pago no cartão não sai de novo no mês')
+assert(invoiceForCard(card, rentOnCard.purchases, 2026, 10, {}).total === 800, 'fixo pago no cartão entra na fatura')
+assert(monthFlow(rentOnCard, '2026-11').expense === 1600, 'o mês seguinte soma o fixo daquele mês e a fatura do pagamento anterior')
+
 const companyCard = {
   ...emptyState(),
   cards: [card],

@@ -94,6 +94,7 @@ export interface FixedExpense {
   name: string
   amount: number
   dueDay: number
+  startDate: string | null
   category: string
   icon: FixedIconId
   notes: string

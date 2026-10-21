@@ -136,7 +136,7 @@ function Shell() {
           {page.id === 'overdue' ? <OverduePage /> : null}
           {page.id === 'fixed' ? <FixedPage /> : null}
           {page.id === 'cards' ? <CardsPage /> : null}
-          {page.id === 'card' ? <CardDetail key={page.cardId} cardId={page.cardId} /> : null}
+          {page.id === 'card' ? <CardDetail key={`${page.cardId}:${page.dueMonth ?? ''}`} cardId={page.cardId} initialDueMonth={page.dueMonth} /> : null}
           {page.id === 'grocery' ? <GroceryPage key={page.compose ? 'compose' : 'grocery'} /> : null}
           {page.id === 'leisure' ? <LeisurePage key={page.compose ? 'compose' : 'leisure'} /> : null}
           {page.id === 'fuel' ? <FuelPage key={page.compose ? 'compose' : 'fuel'} /> : null}

@@ -2,13 +2,17 @@ import { useState } from 'react'
 import { CardDialog, PurchaseDialog } from '../components/dialogs.tsx'
 import { Button, EmptyState, PageIntro, Panel } from '../components/ui.tsx'
 import { formatFriendly, formatShort, monthKey, monthTitle, shiftMonth } from '../lib/dates.ts'
-import { billingMonthForDue, invoiceDueDate, invoiceForCard, limitUsed, openInvoiceMonth, type InvoiceLine } from '../lib/finance.ts'
+import { billingMonthForDue, invoiceDueDate, invoiceForCard, invoicesDueInMonth, limitUsed, openInvoiceMonth, type Invoice, type InvoiceLine } from '../lib/finance.ts'
 import { formatBRL, round2 } from '../lib/money.ts'
-import { cardPalette, categoryLabel, type CreditCard, type CustomCategory, type Purchase } from '../lib/types.ts'
+import { cardPalette, categoryLabel, type AppState, type CreditCard, type CustomCategory, type Purchase } from '../lib/types.ts'
 import { useStore } from '../state.tsx'
 
+function invoiceDueOn(state: AppState, cardId: string, month: string): Invoice | undefined {
+  return invoicesDueInMonth(state, month).find((invoice) => invoice.cardId === cardId)
+}
+
 export function CardsPage() {
-  const { state, today, setPage } = useStore()
+  const { state, today, month, setPage } = useStore()
   const [editing, setEditing] = useState<CreditCard | null | 'new'>(null)
 
   return (
@@ -30,15 +34,17 @@ export function CardsPage() {
         <div className="grid gap-4 md:grid-cols-2">
           {state.cards.map((card) => {
             const used = limitUsed(card, state, today)
-            const open = openInvoiceMonth(today, card.closingDay)
-            const invoice = invoiceForCard(card, state.purchases, open.year, open.monthIndex, state.paidInvoices, state.companyEntries)
+            const current = invoiceDueOn(state, card.id, month)
+            const following = invoiceDueOn(state, card.id, shiftMonth(month, 1))
+            const previous = invoiceDueOn(state, card.id, shiftMonth(month, -1))
+            const featured = current && !current.paid ? current : following
             const palette = cardPalette(card.color)
             const ratio = card.limit > 0 ? Math.min(used / card.limit, 1) : 0
             return (
               <article key={card.id} className="overflow-hidden rounded-2xl border border-line bg-card">
-                <button type="button" onClick={() => setPage({ id: 'card', cardId: card.id })} className="block w-full text-left">
+                <button type="button" onClick={() => featured && setPage({ id: 'card', cardId: card.id, dueMonth: monthKey(featured.due) })} className="block w-full text-left">
                   <div className="m-4 rounded-2xl px-5 py-5 text-white" style={{ background: `linear-gradient(145deg, ${palette.from}, ${palette.to})` }}>
-                    <p className="text-xs tracking-[0.16em] text-white/70 uppercase">Fatura aberta</p>
+                    <p className="text-xs tracking-[0.16em] text-white/70 uppercase">{current && !current.paid ? 'Fatura do mês' : 'Próxima fatura'}</p>
                     <p className="mt-2 font-serif text-3xl">{card.nickname}</p>
                     <p className="mt-6 tracking-[0.22em]">•••• {card.lastFour || '••••'}</p>
                     <div className="mt-4 flex justify-between text-xs text-white/80">
@@ -48,10 +54,21 @@ export function CardsPage() {
                   </div>
                 </button>
                 <div className="px-5 pb-5">
-                  <div className="flex items-baseline justify-between">
-                    <p className="text-sm text-ink-soft">Fecha {formatShort(invoice.closing)}</p>
-                    <p className="font-serif text-2xl tabular-nums">{formatBRL(invoice.total)}</p>
-                  </div>
+                  {featured ? (
+                    <div className="flex items-baseline justify-between gap-3">
+                      <div>
+                        <p className="text-sm text-ink-soft">{monthTitle(monthKey(featured.due))}</p>
+                        <p className="text-xs text-ink-soft">Fecha {formatShort(featured.closing)} · vence {formatShort(featured.due)}</p>
+                      </div>
+                      <p className="font-serif text-2xl tabular-nums">{formatBRL(featured.total)}</p>
+                    </div>
+                  ) : null}
+                  {previous ? (
+                    <div className="mt-1 flex items-baseline justify-between gap-3 text-xs text-ink-soft">
+                      <span>{monthTitle(monthKey(previous.due))}</span>
+                      <span className="tabular-nums">{formatBRL(previous.total)}</span>
+                    </div>
+                  ) : null}
                   <div className="mt-3 h-2 overflow-hidden rounded-full bg-track">
                     <div className={`h-full rounded-full ${card.limit > 0 && used > card.limit ? 'bg-clay' : 'bg-moss'}`} style={{ width: `${card.limit > 0 ? ratio * 100 : 0}%` }} />
                   </div>
@@ -61,7 +78,7 @@ export function CardsPage() {
                       : 'Informe o limite para acompanhar o que ainda cabe.'}
                   </p>
                   <div className="mt-4 flex gap-2">
-                    <Button className="h-9" onClick={() => setPage({ id: 'card', cardId: card.id })}>
+                    <Button className="h-9" onClick={() => featured && setPage({ id: 'card', cardId: card.id, dueMonth: monthKey(featured.due) })}>
                       Abrir fatura
                     </Button>
                     <Button variant="ghost" className="h-9" onClick={() => setEditing(card)}>
@@ -80,12 +97,12 @@ export function CardsPage() {
   )
 }
 
-export function CardDetail({ cardId }: { cardId: string }) {
+export function CardDetail({ cardId, initialDueMonth }: { cardId: string; initialDueMonth?: string }) {
   const { state, today, setPage, toggleInvoicePaid } = useStore()
   const card = state.cards.find((item) => item.id === cardId)
   const open = card ? openInvoiceMonth(today, card.closingDay) : { year: today.getFullYear(), monthIndex: today.getMonth() }
   const openDue = card ? invoiceDueDate(open.year, open.monthIndex, card.closingDay, card.dueDay) : new Date(open.year, open.monthIndex, 1)
-  const [dueMonth, setDueMonth] = useState(monthKey(openDue))
+  const [dueMonth, setDueMonth] = useState(initialDueMonth ?? monthKey(openDue))
   const [purchase, setPurchase] = useState<Purchase | null | 'new'>(null)
   const [editingCard, setEditingCard] = useState(false)
 
