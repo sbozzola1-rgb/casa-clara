@@ -1,12 +1,13 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { CoupleMark } from './components/Brand.tsx'
 import { Button, Field, fieldClass } from './components/ui.tsx'
-import { cloudReady, signIn, supabase } from './lib/cloud.ts'
+import { cloudReady, FINANCE_OK, signIn, supabase } from './lib/cloud.ts'
 import { openRoutine } from './routine/door.ts'
 
 export function HouseGate({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false)
   const [signedIn, setSignedIn] = useState(false)
+  const [unlocked, setUnlocked] = useState(false)
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -17,7 +18,9 @@ export function HouseGate({ children }: { children: ReactNode }) {
       return
     }
     void supabase.auth.getSession().then(({ data }) => {
-      setSignedIn(Boolean(data.session))
+      const active = Boolean(data.session)
+      setSignedIn(active)
+      setUnlocked(active && sessionStorage.getItem(FINANCE_OK) === '1')
       setReady(true)
     })
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -32,6 +35,8 @@ export function HouseGate({ children }: { children: ReactNode }) {
     setError('')
     try {
       await signIn(password)
+      sessionStorage.setItem(FINANCE_OK, '1')
+      setUnlocked(true)
     } catch {
       setError('Senha incorreta.')
     } finally {
@@ -51,7 +56,7 @@ export function HouseGate({ children }: { children: ReactNode }) {
     )
   }
 
-  if (!signedIn) {
+  if (!signedIn || !unlocked) {
     return (
       <div className="grid min-h-screen place-items-center bg-paper px-6">
         <form onSubmit={(event) => void submit(event)} className="w-full max-w-sm">

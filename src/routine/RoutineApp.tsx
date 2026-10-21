@@ -8,6 +8,7 @@ import { ActivityScreen, ActivityTimer, GradeScreen, HomeworkScreen, MealScreen,
 import { askNotificationPermission } from './sound.ts'
 import { RoutineProvider, useRoutine } from './store.tsx'
 import { Field, Modal, PinPad, TextInput } from './ui.tsx'
+import { cloudReady } from '../lib/cloud.ts'
 
 type Gate = 'enter' | 'create' | 'confirm' | 'word' | 'forgot'
 
@@ -20,9 +21,10 @@ export default function RoutineApp({ onLeave }: { onLeave: () => void }) {
 }
 
 function Shell({ onLeave }: { onLeave: () => void }) {
-  const { state, role, tab, setTab, today, toast, leaveParent, notify } = useRoutine()
+  const { state, role, tab, setTab, today, toast, leaveParent, notify, cloudChecked, linked } = useRoutine()
   const [gate, setGate] = useState<Gate | null>(null)
   const [settings, setSettings] = useState(false)
+  const [linkOpen, setLinkOpen] = useState(false)
   const [skippedHandoff, setSkippedHandoff] = useState(false)
   const profile = state.profile
 
@@ -47,6 +49,15 @@ function Shell({ onLeave }: { onLeave: () => void }) {
   useEffect(() => {
     document.title = profile ? `Rotina de ${profile.name}` : 'Rotina'
   }, [profile])
+
+  if (!profile && !cloudChecked) {
+    return (
+      <div className="routine-root grid min-h-screen place-items-center px-6">
+        <Sky />
+        <p className="relative z-10 font-extrabold">Abrindo a rotina…</p>
+      </div>
+    )
+  }
 
   if (!profile) return <Onboarding />
 
@@ -124,6 +135,13 @@ function Shell({ onLeave }: { onLeave: () => void }) {
         </header>
 
         <main className="px-4 pt-2 pb-28 md:px-8 md:pb-12">
+          {cloudReady && cloudChecked && !linked ? (
+            <div className="mb-4 rounded-[1.75rem] bg-white/85 px-6 py-4">
+              <p className="font-extrabold">A rotina da Laura está só neste aparelho.</p>
+              <p className="mt-1 text-sm font-bold text-[var(--soft)]">Salva na casa para o tablet dela abrir o mesmo link, sem começar outro cadastro.</p>
+              <button type="button" className="btn-primary mt-3" onClick={() => setLinkOpen(true)}>Salvar na casa</button>
+            </div>
+          ) : null}
           {tab === 'hoje' ? <TodayScreen /> : null}
           {tab === 'escola' ? <SchoolScreen /> : null}
           {tab === 'licao' ? <HomeworkScreen /> : null}
@@ -162,6 +180,7 @@ function Shell({ onLeave }: { onLeave: () => void }) {
           }}
         />
       ) : null}
+      {linkOpen ? <HouseLink purpose="save" onClose={() => setLinkOpen(false)} /> : null}
       {settings ? (
         <Settings
           onClose={() => setSettings(false)}
@@ -222,6 +241,7 @@ function Onboarding() {
   const { saveProfile } = useRoutine()
   const [name, setName] = useState('')
   const [look, setLook] = useState<AvatarLook>(defaultAvatar)
+  const [openHouse, setOpenHouse] = useState(false)
 
   return (
     <div className="routine-root relative min-h-screen">
@@ -231,27 +251,84 @@ function Onboarding() {
           <Avatar look={look} size={230} className="avatar-bob mx-auto" />
           <p className="font-display mt-2 text-4xl">{name.trim() || 'Oi!'}</p>
         </div>
-        <section className="card px-6 py-6 md:px-8 md:py-8">
-          <h1 className="font-display text-4xl">Vamos criar o seu cantinho</h1>
-          <p className="mt-2 text-[var(--soft)]">Escreva seu nome e monte o bonequinho do jeitinho que você é.</p>
-          <label className="mt-5 grid gap-1.5 font-extrabold">
-            Seu nome
-            <input className="field-input" maxLength={24} autoFocus value={name} placeholder="Seu nome" onChange={(event) => setName(event.target.value)} />
-          </label>
-          <div className="mt-5">
-            <AvatarStudio look={look} onChange={setLook} />
-          </div>
-          <button
-            type="button"
-            className="btn-primary mt-6 w-full"
-            disabled={name.trim().length === 0}
-            onClick={() => saveProfile({ name: name.trim(), avatar: look, pin: '', recovery: '' })}
-          >
-            É assim que eu sou!
-          </button>
-        </section>
+        <div className="grid gap-4">
+          {cloudReady ? (
+            <section className="card px-6 py-6">
+              <h1 className="font-display text-4xl">A Laura já existe</h1>
+              <p className="mt-2 text-[var(--soft)]">Se o cantinho foi criado em outro aparelho, entra com a senha da casa. Ela abre aqui, sem um cadastro novo.</p>
+              <button type="button" className="btn-primary mt-5 w-full" onClick={() => setOpenHouse(true)}>Abrir a rotina da Laura</button>
+            </section>
+          ) : null}
+          <section className="card px-6 py-6 md:px-8 md:py-8">
+            <h1 className="font-display text-4xl">Vamos criar o seu cantinho</h1>
+            <p className="mt-2 text-[var(--soft)]">Escreva seu nome e monte o bonequinho do jeitinho que você é.</p>
+            <label className="mt-5 grid gap-1.5 font-extrabold">
+              Seu nome
+              <input className="field-input" maxLength={24} value={name} placeholder="Seu nome" onChange={(event) => setName(event.target.value)} />
+            </label>
+            <div className="mt-5">
+              <AvatarStudio look={look} onChange={setLook} />
+            </div>
+            <button
+              type="button"
+              className="btn-primary mt-6 w-full"
+              disabled={name.trim().length === 0}
+              onClick={() => saveProfile({ name: name.trim(), avatar: look, pin: '', recovery: '' })}
+            >
+              É assim que eu sou!
+            </button>
+          </section>
+        </div>
       </div>
+      {openHouse ? <HouseLink purpose="open" onClose={() => setOpenHouse(false)} /> : null}
     </div>
+  )
+}
+
+function HouseLink({ purpose, onClose }: { purpose: 'save' | 'open'; onClose: () => void }) {
+  const { linkHouse, notify } = useRoutine()
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      const result = await linkHouse(password)
+      if (result === 'empty') {
+        setError('Ainda não tem rotina salva na casa. No computador, abre a rotina e toca em Salvar na casa.')
+        return
+      }
+      notify(result === 'saved' ? 'Rotina salva. No tablet dela, abre o mesmo link e entra com a senha da casa.' : 'Rotina da Laura aberta neste aparelho.')
+      onClose()
+    } catch {
+      setError('Senha incorreta.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal
+      title={purpose === 'save' ? 'Salvar na casa' : 'Abrir a rotina da Laura'}
+      description={purpose === 'save' ? 'A senha da casa guarda a rotina para o tablet dela abrir o mesmo link.' : 'Entra com a senha da casa. A Laura que já foi criada vem para este aparelho.'}
+      onClose={onClose}
+      footer={(
+        <>
+          <button type="button" className="btn-ghost" onClick={onClose}>Agora não</button>
+          <button type="submit" form="house-link" className="btn-primary" disabled={busy || password.length === 0}>Entrar</button>
+        </>
+      )}
+    >
+      <form id="house-link" onSubmit={(event) => void submit(event)} className="grid gap-4">
+        <Field label="Senha da casa">
+          <TextInput type="password" autoComplete="current-password" autoFocus value={password} onChange={(event) => setPassword(event.target.value)} />
+        </Field>
+        {error ? <p className="text-sm font-bold text-rose-500">{error}</p> : null}
+      </form>
+    </Modal>
   )
 }
 
