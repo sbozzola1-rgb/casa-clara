@@ -133,7 +133,7 @@ export function CardDetail({ cardId }: { cardId: string }) {
               {card.limit > 0 ? `${formatBRL(used)} comprometidos de ${formatBRL(card.limit)}` : 'Limite ainda não informado.'}
             </p>
             <p className="mt-3 text-xs leading-relaxed text-ink-soft">
-              Parcelas que ainda vão vencer ocupam o limite. Fatura marcada como paga libera a parcela.
+À vista e parcelas em aberto ocupam o limite, mesmo com a fatura vencida. Marcar como paga libera esse valor.
             </p>
             <Button variant="ghost" className="mt-4 h-9 px-3" onClick={() => setEditingCard(true)}>
               Editar cartão

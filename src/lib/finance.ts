@@ -152,15 +152,13 @@ export function invoicesDueInMonth(state: AppState, month: string): Invoice[] {
   return invoices.sort((a, b) => a.due.getTime() - b.due.getTime())
 }
 
-export function limitUsed(card: CreditCard, state: AppState, today: Date): number {
+export function limitUsed(card: CreditCard, state: AppState, _today: Date): number {
   let total = 0
   for (const purchase of state.purchases) {
     if (purchase.cardId !== card.id) continue
     for (const installment of installmentSchedule(purchase)) {
       const bill = invoiceMonthFor(installment.date, card.closingDay)
       if (state.paidInvoices[invoiceKey(card.id, bill.year, bill.monthIndex)]) continue
-      const due = invoiceDueDate(bill.year, bill.monthIndex, card.closingDay, card.dueDay)
-      if (startOfDay(due).getTime() < startOfDay(today).getTime()) continue
       total += installment.amount
     }
   }
@@ -169,8 +167,6 @@ export function limitUsed(card: CreditCard, state: AppState, today: Date): numbe
     for (const installment of installmentSchedule({ amount: entry.amount, installments: entry.installments, date: entry.date })) {
       const bill = invoiceMonthFor(installment.date, card.closingDay)
       if (state.paidInvoices[invoiceKey(card.id, bill.year, bill.monthIndex)]) continue
-      const due = invoiceDueDate(bill.year, bill.monthIndex, card.closingDay, card.dueDay)
-      if (startOfDay(due).getTime() < startOfDay(today).getTime()) continue
       total += installment.amount
     }
   }

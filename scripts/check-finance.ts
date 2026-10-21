@@ -62,9 +62,12 @@ const december = invoiceForCard(card, state.purchases, 2026, 11, {})
 assert(december.total === 100 && december.lines[0]?.installment === 2, 'segunda parcela vai para dezembro')
 
 const today = parseDate('2026-10-20')
-assert(limitUsed(card, state, today) === 700, 'limite soma as parcelas que ainda vão vencer')
+assert(limitUsed(card, state, today) === 700, 'limite soma à vista e todas as parcelas em aberto')
+const afterDue = parseDate('2026-11-11')
+assert(limitUsed(card, state, afterDue) === 700, 'fatura vencida e não paga continua no limite')
 const paidNovember = stateWith([mercado, parcelado], { 'card-1:2026-11': true })
 assert(limitUsed(card, paidNovember, today) === 200, 'fatura paga libera o que estava nela')
+assert(limitUsed(card, paidNovember, afterDue) === 200, 'fatura paga continua fora do limite depois do vencimento')
 
 const grocery = spentInRange(state, 'mercado', parseDate('2026-10-01'), parseDate('2026-10-31'))
 assert(grocery.total === 400, 'compra à vista entra inteira no mês')
