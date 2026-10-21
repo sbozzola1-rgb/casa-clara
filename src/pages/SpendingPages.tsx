@@ -3,7 +3,7 @@ import { GroceryInflowDialog, MoneyDialog, SpendDialog } from '../components/dia
 import { BudgetMeter, Button, CompareBars, EmptyState, PageIntro, Panel } from '../components/ui.tsx'
 import { addDays, formatFriendly, monthName, monthRange, monthTitle, startOfWeek, weekTitle } from '../lib/dates.ts'
 import { fuelGoal, fuelSeries, groceryGoal, groceryInflowApplies, grocerySeries, leisureSeries, spentInRange } from '../lib/finance.ts'
-import { formatBRL } from '../lib/money.ts'
+import { formatBRL, round2 } from '../lib/money.ts'
 import type { GroceryInflow, SpendEntry } from '../lib/types.ts'
 import { useStore } from '../state.tsx'
 
@@ -58,7 +58,12 @@ export function GroceryPage() {
                   <button type="button" onClick={() => setInflow(item)} className="flex w-full items-center justify-between gap-3 py-3 text-left">
                     <span>
                       <span className="block text-sm font-medium">{item.name}</span>
-                      <span className="block text-xs text-ink-soft">{item.repeat === 'monthly' ? 'Todo mês' : 'Só neste mês'}</span>
+                      <span className="block text-xs text-ink-soft">
+                        {item.repeat === 'monthly' ? 'Todo mês' : 'Só neste mês'}
+                        {usedOf(state.cashExpenses, item.id, month) > 0
+                          ? ` · usado ${formatBRL(usedOf(state.cashExpenses, item.id, month))}`
+                          : ''}
+                      </span>
                     </span>
                     <span className="text-sm font-medium tabular-nums">{formatBRL(item.amount)}</span>
                   </button>
@@ -226,6 +231,14 @@ export function LeisurePage() {
 
       {dialog !== null ? <SpendDialog category="lazer" entry={dialog === 'new' ? null : dialog} onClose={close} /> : null}
     </div>
+  )
+}
+
+function usedOf(expenses: { inflowId: string | null; date: string; amount: number }[], inflowId: string, month: string) {
+  return round2(
+    expenses
+      .filter((expense) => expense.inflowId === inflowId && expense.date.startsWith(month))
+      .reduce((sum, expense) => sum + expense.amount, 0),
   )
 }
 

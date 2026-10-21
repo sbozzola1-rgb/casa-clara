@@ -127,6 +127,7 @@ export interface CashExpense {
   date: string
   category: BudgetCategory
   method: PaymentMethod
+  inflowId: string | null
 }
 
 export interface Goals {

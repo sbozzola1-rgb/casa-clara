@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { CardDialog, PurchaseDialog } from '../components/dialogs.tsx'
 import { Button, EmptyState, PageIntro, Panel } from '../components/ui.tsx'
-import { formatFriendly, formatShort, monthKey, monthTitle, parseMonthKey, shiftMonth } from '../lib/dates.ts'
-import { invoiceForCard, limitUsed, openInvoiceMonth } from '../lib/finance.ts'
+import { formatFriendly, formatShort, monthKey, monthTitle, shiftMonth } from '../lib/dates.ts'
+import { billingMonthForDue, invoiceDueDate, invoiceForCard, limitUsed, openInvoiceMonth } from '../lib/finance.ts'
 import { formatBRL, round2 } from '../lib/money.ts'
 import { cardPalette, categoryLabel, type CreditCard, type Purchase } from '../lib/types.ts'
 import { useStore } from '../state.tsx'
@@ -84,7 +84,8 @@ export function CardDetail({ cardId }: { cardId: string }) {
   const { state, today, setPage, toggleInvoicePaid } = useStore()
   const card = state.cards.find((item) => item.id === cardId)
   const open = card ? openInvoiceMonth(today, card.closingDay) : { year: today.getFullYear(), monthIndex: today.getMonth() }
-  const [billMonth, setBillMonth] = useState(monthKey(new Date(open.year, open.monthIndex, 1)))
+  const openDue = card ? invoiceDueDate(open.year, open.monthIndex, card.closingDay, card.dueDay) : new Date(open.year, open.monthIndex, 1)
+  const [dueMonth, setDueMonth] = useState(monthKey(openDue))
   const [purchase, setPurchase] = useState<Purchase | null | 'new'>(null)
   const [editingCard, setEditingCard] = useState(false)
 
@@ -98,8 +99,8 @@ export function CardDetail({ cardId }: { cardId: string }) {
     )
   }
 
-  const { year, monthIndex } = parseMonthKey(billMonth)
-  const invoice = invoiceForCard(card, state.purchases, year, monthIndex, state.paidInvoices, state.companyEntries)
+  const billing = billingMonthForDue(dueMonth, card.closingDay, card.dueDay)
+  const invoice = invoiceForCard(card, state.purchases, billing.year, billing.monthIndex, state.paidInvoices, state.companyEntries)
   const used = limitUsed(card, state, today)
   const palette = cardPalette(card.color)
   const purchases = state.purchases
@@ -147,11 +148,11 @@ export function CardDetail({ cardId }: { cardId: string }) {
           >
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <button type="button" aria-label="Fatura anterior" onClick={() => setBillMonth(shiftMonth(billMonth, -1))} className="grid h-9 w-9 place-items-center rounded-full hover:bg-paper">
+                <button type="button" aria-label="Fatura anterior" onClick={() => setDueMonth(shiftMonth(dueMonth, -1))} className="grid h-9 w-9 place-items-center rounded-full hover:bg-paper">
                   <Chevron />
                 </button>
-                <p className="min-w-36 text-center text-sm font-medium">{monthTitle(billMonth)}</p>
-                <button type="button" aria-label="Próxima fatura" onClick={() => setBillMonth(shiftMonth(billMonth, 1))} className="grid h-9 w-9 place-items-center rounded-full hover:bg-paper">
+                <p className="min-w-36 text-center text-sm font-medium">{monthTitle(dueMonth)}</p>
+                <button type="button" aria-label="Próxima fatura" onClick={() => setDueMonth(shiftMonth(dueMonth, 1))} className="grid h-9 w-9 place-items-center rounded-full hover:bg-paper">
                   <Chevron direction="right" />
                 </button>
               </div>

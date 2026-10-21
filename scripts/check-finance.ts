@@ -1,5 +1,5 @@
 import { addMonthsClamped, parseDate, startOfWeek } from '../src/lib/dates.ts'
-import { fuelGoal, groceryGoal, installmentSchedule, invoiceDueDate, invoiceForCard, invoiceMonthFor, limitUsed, monthFlow, overdueItems, spentInRange } from '../src/lib/finance.ts'
+import { billingMonthForDue, fuelGoal, groceryGoal, installmentSchedule, invoiceDueDate, invoiceForCard, invoiceMonthFor, limitUsed, monthFlow, monthReport, overdueItems, spendEntries, spentInRange } from '../src/lib/finance.ts'
 import { sanitize } from '../src/lib/storage.ts'
 import { emptyState, type AppState, type CreditCard, type Purchase } from '../src/lib/types.ts'
 
@@ -141,14 +141,29 @@ const valeMensal = {
   groceryInflows: [{ id: 'vale', name: 'Vale alimentação', amount: 400, month: '2026-10', repeat: 'monthly' as const }],
 }
 assert(groceryGoal(valeMensal, '2026-11').amount === 1900, 'vale mensal continua nos meses seguintes')
+const paidWithVale = {
+  ...withVale,
+  cashExpenses: [
+    { id: 'horti', description: 'Hortifruti', amount: 80, date: '2026-10-20', category: 'mercado' as const, method: 'pix' as const, inflowId: 'vale' },
+    { id: 'feira', description: 'Feira', amount: 30, date: '2026-10-21', category: 'mercado' as const, method: 'pix' as const, inflowId: null },
+  ],
+}
+assert(spentInRange(paidWithVale, 'mercado', parseDate('2026-10-01'), parseDate('2026-10-31')).total === 110, 'compra com vale entra na meta')
+assert(monthReport(paidWithVale, '2026-10').cashTotal === 30, 'compra com vale não sai do salário')
+assert(spendEntries(paidWithVale, 'mercado').find((entry) => entry.id === 'horti')?.detail === 'Vale alimentação', 'a lista mostra o vale')
 
 const withFuel = {
   ...emptyState(),
   goals: { ...emptyState().goals, fuelMonthlyDefault: 600, fuelByMonth: { '2026-11': 700 } },
-  cashExpenses: [{ id: 'posto', description: 'Posto', amount: 180, date: '2026-10-20', category: 'combustivel' as const, method: 'pix' as const }],
+  cashExpenses: [{ id: 'posto', description: 'Posto', amount: 180, date: '2026-10-20', category: 'combustivel' as const, method: 'pix' as const, inflowId: null }],
 }
 assert(fuelGoal(withFuel, '2026-10').amount === 600, 'combustível de outubro usa a meta padrão')
 assert(fuelGoal(withFuel, '2026-11').amount === 700, 'combustível de novembro usa o ajuste do mês')
+
+const portoDue = billingMonthForDue('2026-11', 29, 7)
+assert(portoDue.year === 2026 && portoDue.monthIndex === 9, 'vencimento em novembro usa o fechamento de outubro')
+const itauDue = billingMonthForDue('2026-10', 14, 21)
+assert(itauDue.year === 2026 && itauDue.monthIndex === 9, 'vencimento no mesmo mês do fechamento permanece em outubro')
 assert(spentInRange(withFuel, 'combustivel', parseDate('2026-10-01'), parseDate('2026-10-31')).total === 180, 'abastecimento entra no mês da data')
 
 console.log('finanças ok')

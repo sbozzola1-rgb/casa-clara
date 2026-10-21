@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { formatShort, parseDate, parseDay, todayISO } from '../lib/dates.ts'
 import { ExpenseIcon } from './ExpenseIcon.tsx'
-import { installmentSchedule } from '../lib/finance.ts'
+import { groceryInflowApplies, installmentSchedule } from '../lib/finance.ts'
 import { formatBRL, formatInput, parseMoney, uid } from '../lib/money.ts'
 import {
   CARD_COLORS,
@@ -574,12 +574,22 @@ export function SpendDialog({
   const [description, setDescription] = useState(entry?.description ?? '')
   const [amount, setAmount] = useState(entry ? formatInput(entry.amount) : '')
   const [date, setDate] = useState(entry?.date ?? todayISO())
-  const [method, setMethod] = useState<'cartao' | PaymentMethod>(existingPurchase ? 'cartao' : (existingCash?.method ?? 'pix'))
+  const [method, setMethod] = useState(
+    existingPurchase ? 'cartao' : existingCash?.inflowId ? `fonte:${existingCash.inflowId}` : (existingCash?.method ?? 'pix'),
+  )
   const [cardId, setCardId] = useState(existingPurchase?.cardId ?? state.cards[0]?.id ?? '')
   const [installments, setInstallments] = useState(String(existingPurchase?.installments ?? 1))
   const [error, setError] = useState('')
   const [confirming, setConfirming] = useState(false)
   const title = category === 'mercado' ? 'Compra de mercado' : category === 'combustivel' ? 'Abastecimento' : 'Gasto de lazer'
+  const purchaseMonth = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date.slice(0, 7) : ''
+  const fontes = category === 'mercado'
+    ? state.groceryInflows.filter((item) => purchaseMonth && groceryInflowApplies(item, purchaseMonth))
+    : []
+  const selectedFonte = method.startsWith('fonte:')
+    ? state.groceryInflows.find((item) => item.id === method.slice('fonte:'.length))
+    : undefined
+  const fonteOptions = selectedFonte && !fontes.some((item) => item.id === selectedFonte.id) ? [selectedFonte, ...fontes] : fontes
 
   const save = () => {
     const parsedAmount = parseMoney(amount)
@@ -596,6 +606,11 @@ export function SpendDialog({
       return
     }
     const id = entry?.id ?? uid()
+    const inflowId = method.startsWith('fonte:') ? method.slice('fonte:'.length) : null
+    if (inflowId && !state.groceryInflows.some((item) => item.id === inflowId)) {
+      setError('Essa fonte de entrada não existe mais.')
+      return
+    }
     if (method === 'cartao') {
       if (!cardId) {
         setError('Cadastre um cartão ou escolha Pix, débito ou dinheiro.')
@@ -617,7 +632,8 @@ export function SpendDialog({
         amount: parsedAmount,
         date,
         category,
-        method,
+        method: inflowId ? 'pix' : (method as PaymentMethod),
+        inflowId,
       }
       saveSpend(entry, { kind: 'cash', expense })
     }
@@ -680,8 +696,16 @@ export function SpendDialog({
                   {item.label}
                 </option>
               ))}
+              {fonteOptions.map((item) => (
+                <option key={item.id} value={`fonte:${item.id}`}>
+                  {item.name}
+                </option>
+              ))}
             </select>
           </Field>
+          {category === 'mercado' && fonteOptions.length === 0 ? (
+            <p className="-mt-2 text-xs text-ink-soft">Para pagar com vale alimentação, cadastre a fonte de entrada neste mês.</p>
+          ) : null}
           {method === 'cartao' ? (
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Cartão">

@@ -57,6 +57,13 @@ export function invoiceDueDate(year: number, monthIndex: number, closingDay: num
   return dateOn(next.getFullYear(), next.getMonth(), dueDay)
 }
 
+export function billingMonthForDue(dueMonth: string, closingDay: number, dueDay: number): { year: number; monthIndex: number } {
+  const { year, monthIndex } = parseMonthKey(dueMonth)
+  if (dueDay > closingDay) return { year, monthIndex }
+  const previous = new Date(year, monthIndex - 1, 1)
+  return { year: previous.getFullYear(), monthIndex: previous.getMonth() }
+}
+
 export function openInvoiceMonth(today: Date, closingDay: number): { year: number; monthIndex: number } {
   return invoiceMonthFor(today, closingDay)
 }
@@ -222,7 +229,9 @@ export function spendEntries(state: AppState, category: BudgetCategory): SpendEn
       amount: expense.amount,
       date: expense.date,
       category,
-      detail: methodLabel(expense.method),
+      detail: expense.inflowId
+        ? (state.groceryInflows.find((item) => item.id === expense.inflowId)?.name ?? 'Fonte de entrada')
+        : methodLabel(expense.method),
     }))
   return [...fromCards, ...fromCash].sort((a, b) => b.date.localeCompare(a.date) || a.description.localeCompare(b.description))
 }
@@ -343,7 +352,7 @@ export function monthReport(state: AppState, month: string): MonthReport {
   const { start, end } = monthRange(month)
   const cashTotal = round2(
     state.cashExpenses
-      .filter((expense) => inRange(parseDate(expense.date), start, end))
+      .filter((expense) => !expense.inflowId && inRange(parseDate(expense.date), start, end))
       .reduce((sum, expense) => sum + expense.amount, 0),
   )
   const outflow = round2(fixedTotal + invoiceTotal + cashTotal)

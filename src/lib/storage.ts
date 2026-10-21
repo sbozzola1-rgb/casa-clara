@@ -54,6 +54,25 @@ function readIncomes(source: { incomes?: unknown; monthlyIncome?: unknown }): In
   return []
 }
 
+function readGroceryInflows(value: unknown): GroceryInflow[] {
+  if (!Array.isArray(value)) return []
+  const items: GroceryInflow[] = []
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || typeof item.id !== 'string') continue
+    const amount = numberOrNull(item.amount)
+    const month = text(item.month)
+    if (amount == null || amount <= 0 || !/^\d{4}-\d{2}$/.test(month)) continue
+    items.push({
+      id: item.id,
+      name: text(item.name).trim() || 'Vale alimentação',
+      amount,
+      month,
+      repeat: item.repeat === 'once' ? 'once' : 'monthly',
+    })
+  }
+  return items
+}
+
 function readCustomCategories(value: unknown): CustomCategory[] {
   if (!Array.isArray(value)) return []
   const seen = new Set<string>()
@@ -88,6 +107,7 @@ export function sanitize(input: unknown): AppState | null {
   const fuelByMonth = readMonthAmounts(goals.fuelByMonth)
   const customCategories = readCustomCategories(source.customCategories)
   const customIds = new Set(customCategories.map((item) => item.id))
+  const groceryInflows = readGroceryInflows(source.groceryInflows)
 
   return {
     version: 1,
@@ -176,28 +196,12 @@ export function sanitize(input: unknown): AppState | null {
                 date: /^\d{4}-\d{2}-\d{2}$/.test(text(item.date)) ? text(item.date) : '2026-01-01',
                 category,
                 method: (methodIds.has(text(item.method)) ? item.method : 'pix') as PaymentMethod,
+                inflowId: text(item.inflowId).trim() || null,
               },
             ]
           })
       : [],
-    groceryInflows: Array.isArray(source.groceryInflows)
-      ? source.groceryInflows
-          .filter((item) => item && typeof item === 'object' && typeof item.id === 'string')
-          .flatMap((item): GroceryInflow[] => {
-            const amount = numberOrNull(item.amount)
-            const month = text(item.month)
-            if (amount == null || amount <= 0 || !/^\d{4}-\d{2}$/.test(month)) return []
-            return [
-              {
-                id: item.id,
-                name: text(item.name).trim() || 'Vale alimentação',
-                amount,
-                month,
-                repeat: item.repeat === 'once' ? 'once' : 'monthly',
-              },
-            ]
-          })
-      : [],
+    groceryInflows,
     paidFixed: flagMap(source.paidFixed),
     paidInvoices: flagMap(source.paidInvoices),
     goals: {
