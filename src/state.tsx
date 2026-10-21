@@ -3,7 +3,7 @@ import { pullHousehold, pushHousehold, subscribeHousehold } from './lib/cloud.ts
 import { uid } from './lib/money.ts'
 import { monthKey } from './lib/dates.ts'
 import { loadState, sanitize, saveState } from './lib/storage.ts'
-import { emptyState, SPEND_CATEGORIES, type AppState, type CashExpense, type CompanyEntry, type CreditCard, type FixedExpense, type GroceryInflow, type IncomeSource, type Purchase, type SpendEntry } from './lib/types.ts'
+import { emptyState, SPEND_CATEGORIES, type AppState, type CashExpense, type CompanyEntry, type CreditCard, type FixedExpense, type GroceryInflow, type IncomeSource, type LeisurePlan, type Purchase, type SavingPot, type SpendEntry } from './lib/types.ts'
 
 export type Page =
   | { id: 'dashboard' }
@@ -16,6 +16,8 @@ export type Page =
   | { id: 'overdue' }
   | { id: 'company' }
   | { id: 'goals' }
+  | { id: 'savings' }
+  | { id: 'plans' }
 
 interface Store {
   state: AppState
@@ -49,6 +51,10 @@ interface Store {
   removeGroceryInflow: (id: string) => void
   addCustomCategory: (name: string) => string
   removeCustomCategory: (id: string) => void
+  upsertSaving: (pot: SavingPot) => void
+  removeSaving: (id: string) => void
+  upsertPlan: (plan: LeisurePlan) => void
+  removePlan: (id: string) => void
   replaceState: (input: unknown) => void
 }
 
@@ -343,6 +349,32 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           purchases: current.purchases.map((item) => (item.category === id ? { ...item, category: 'outro' } : item)),
         }))
         notify('Categoria removida')
+      },
+      upsertSaving: (pot) => {
+        setState((current) => ({
+          ...current,
+          savings: current.savings.some((item) => item.id === pot.id)
+            ? current.savings.map((item) => (item.id === pot.id ? pot : item))
+            : [...current.savings, pot],
+        }))
+        notify('Economia salva')
+      },
+      removeSaving: (id) => {
+        setState((current) => ({ ...current, savings: current.savings.filter((item) => item.id !== id) }))
+        notify('Economia removida')
+      },
+      upsertPlan: (plan) => {
+        setState((current) => ({
+          ...current,
+          leisurePlans: current.leisurePlans.some((item) => item.id === plan.id)
+            ? current.leisurePlans.map((item) => (item.id === plan.id ? plan : item))
+            : [...current.leisurePlans, plan],
+        }))
+        notify('Plano de lazer salvo')
+      },
+      removePlan: (id) => {
+        setState((current) => ({ ...current, leisurePlans: current.leisurePlans.filter((item) => item.id !== id) }))
+        notify('Plano de lazer removido')
       },
       replaceState: (next: unknown) => {
         const clean = sanitize(next)

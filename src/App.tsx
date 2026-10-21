@@ -7,18 +7,22 @@ import { Dashboard } from './pages/Dashboard.tsx'
 import { FixedPage } from './pages/FixedPage.tsx'
 import { GoalsPage } from './pages/GoalsPage.tsx'
 import { OverduePage } from './pages/OverduePage.tsx'
+import { PlansPage, SavingsPage } from './pages/CouplePages.tsx'
 import { FuelPage, GroceryPage, LeisurePage } from './pages/SpendingPages.tsx'
 import { HouseGate } from './auth.tsx'
+import { CoupleMark } from './components/Brand.tsx'
 import { signOut } from './lib/cloud.ts'
 import { StoreProvider, useStore, type Page } from './state.tsx'
 
-const NAV: { id: Page['id']; label: string; icon: 'home' | 'late' | 'fixed' | 'card' | 'market' | 'leisure' | 'fuel' | 'company' | 'goal' }[] = [
+const NAV: { id: Page['id']; label: string; icon: 'home' | 'late' | 'fixed' | 'card' | 'market' | 'leisure' | 'fuel' | 'company' | 'goal' | 'saving' | 'plan' }[] = [
   { id: 'dashboard', label: 'Início', icon: 'home' },
   { id: 'overdue', label: 'Vencidas', icon: 'late' },
   { id: 'fixed', label: 'Fixos', icon: 'fixed' },
   { id: 'cards', label: 'Cartões', icon: 'card' },
   { id: 'grocery', label: 'Mercado', icon: 'market' },
   { id: 'leisure', label: 'Lazer', icon: 'leisure' },
+  { id: 'plans', label: 'Planos', icon: 'plan' },
+  { id: 'savings', label: 'Economias', icon: 'saving' },
   { id: 'fuel', label: 'Combustível', icon: 'fuel' },
   { id: 'company', label: 'Empresa', icon: 'company' },
   { id: 'goals', label: 'Metas', icon: 'goal' },
@@ -57,20 +61,12 @@ function Shell() {
   }
 
   return (
-    <div className="min-h-screen bg-paper text-ink md:grid md:grid-cols-[240px_1fr]">
+    <div className="min-h-screen bg-paper text-ink md:grid md:grid-cols-[272px_1fr]">
       <aside className="hidden md:flex md:flex-col md:bg-ink md:text-white">
-        <div className="px-6 pt-7 pb-6">
-          <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/10">
-              <HomeIcon />
-            </span>
-            <span>
-              <span className="block font-serif text-2xl leading-none">Casa Clara</span>
-              <span className="mt-1 block text-xs text-white/55">Finanças da casa</span>
-            </span>
-          </div>
+        <div className="px-5 pt-7 pb-6">
+          <CoupleMark tone="light" />
         </div>
-        <nav className="flex flex-1 flex-col gap-1 px-3">
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3">
           {NAV.map((item) => {
             const active = page.id === item.id || (item.id === 'cards' && page.id === 'card')
             return (
@@ -105,8 +101,10 @@ function Shell() {
 
       <div className="min-w-0">
         <header className="sticky top-0 z-20 border-b border-line bg-paper/90 backdrop-blur">
-          <div className="flex items-center justify-between gap-3 px-4 py-3 md:px-8">
-            <p className="font-serif text-xl md:hidden">Casa Clara</p>
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3 md:px-8">
+            <div className="w-full md:hidden">
+              <CoupleMark size="compact" />
+            </div>
             <div className="flex items-center gap-1">
               <button type="button" aria-label="Mês anterior" onClick={() => setMonth(shiftMonth(month, -1))} className="grid h-9 w-9 place-items-center rounded-full hover:bg-white">
                 <Chevron />
@@ -137,6 +135,8 @@ function Shell() {
           {page.id === 'fuel' ? <FuelPage key={page.compose ? 'compose' : 'fuel'} /> : null}
           {page.id === 'company' ? <CompanyPage /> : null}
           {page.id === 'goals' ? <GoalsPage /> : null}
+          {page.id === 'savings' ? <SavingsPage /> : null}
+          {page.id === 'plans' ? <PlansPage /> : null}
         </main>
       </div>
 
@@ -204,6 +204,8 @@ function NavIcon({ name }: { name: (typeof NAV)[number]['icon'] }) {
   if (name === 'leisure') return <Icon path="M4 13.5 8 4l2 5 2-2 4 6.5" />
   if (name === 'fuel') return <Icon path="M7 16.5V6.5h5v10M9 6.5V4.5h1.5M12 9h2.2a1.5 1.5 0 0 1 0 3H12" />
   if (name === 'company') return <Icon path="M4 16.5h12M6.5 16.5V5.5h7v11M8.2 8h1.2M10.6 8h1.2M8.2 10.5h1.2M10.6 10.5h1.2" />
+  if (name === 'saving') return <Icon path="M6 15.5h8a3 3 0 0 0 0-6h-1.2a2.2 2.2 0 1 1 0-4.4H8" />
+  if (name === 'plan') return <Icon path="M6 4.5h8v11H6v-11Zm2 3h4M8 10h4" />
   return <Icon path="M10 3.5v13M6 7.5h5.5a2.5 2.5 0 0 1 0 5H6" />
 }
 

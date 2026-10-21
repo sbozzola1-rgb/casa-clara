@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { CoupleMark } from './components/Brand.tsx'
 import { Button, Field, fieldClass } from './components/ui.tsx'
 import { cloudReady, signIn, supabase } from './lib/cloud.ts'
 
@@ -53,7 +54,7 @@ export function HouseGate({ children }: { children: ReactNode }) {
     return (
       <div className="grid min-h-screen place-items-center bg-paper px-6">
         <form onSubmit={(event) => void submit(event)} className="w-full max-w-sm">
-          <h1 className="font-serif text-4xl tracking-tight">Casa Clara</h1>
+          <CoupleMark />
           <p className="mt-3 text-sm leading-relaxed text-ink-soft">
             A senha é a mesma para você e para o Vinicius. O que um lançar, o outro vê.
           </p>

@@ -1,4 +1,4 @@
-import { emptyState, CARD_COLORS, COMPANY_CATEGORIES, COMPANY_PAYMENTS, FIXED_ICONS, iconForCategory, PAYMENT_METHODS, PEOPLE, SPEND_CATEGORIES, type AppState, type CardColorId, type CompanyDirection, type CompanyPayment, type CustomCategory, type FixedIconId, type GroceryInflow, type IncomeSource, type PaymentMethod, type Person } from './types.ts'
+import { emptyState, CARD_COLORS, COMPANY_CATEGORIES, COMPANY_PAYMENTS, FIXED_ICONS, iconForCategory, PAYMENT_METHODS, PEOPLE, SPEND_CATEGORIES, type AppState, type CardColorId, type CompanyDirection, type CompanyPayment, type CustomCategory, type FixedIconId, type GroceryInflow, type IncomeSource, type LeisurePlan, type PaymentMethod, type Person, type SavingPot } from './types.ts'
 
 const KEY = 'casa-clara.v1'
 const spendIds = new Set<string>(SPEND_CATEGORIES.map((item) => item.id))
@@ -213,7 +213,33 @@ export function sanitize(input: unknown): AppState | null {
       fuelByMonth,
     },
     customCategories,
+    savings: readSavings(source.savings),
+    leisurePlans: readLeisurePlans(source.leisurePlans),
   }
+}
+
+function readSavings(value: unknown): SavingPot[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object' || typeof item.id !== 'string') return []
+    const name = text(item.name).trim()
+    const target = numberOrNull(item.target)
+    const saved = numberOrNull(item.saved) ?? 0
+    if (!name || target == null || target <= 0) return []
+    return [{ id: item.id, name, target, saved }]
+  })
+}
+
+function readLeisurePlans(value: unknown): LeisurePlan[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object' || typeof item.id !== 'string') return []
+    const name = text(item.name).trim()
+    const date = text(item.date)
+    const amount = numberOrNull(item.amount)
+    if (!name || !/^\d{4}-\d{2}-\d{2}$/.test(date) || amount == null || amount <= 0) return []
+    return [{ id: item.id, name, date, amount, note: text(item.note).trim() }]
+  })
 }
 
 export function loadState(): AppState {

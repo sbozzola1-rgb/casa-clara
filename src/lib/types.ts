@@ -190,6 +190,21 @@ export interface CompanyEntry {
   purchaseId: string | null
 }
 
+export interface SavingPot {
+  id: string
+  name: string
+  target: number
+  saved: number
+}
+
+export interface LeisurePlan {
+  id: string
+  name: string
+  date: string
+  amount: number
+  note: string
+}
+
 export interface AppState {
   version: 1
   incomes: IncomeSource[]
@@ -203,6 +218,8 @@ export interface AppState {
   goals: Goals
   groceryInflows: GroceryInflow[]
   customCategories: CustomCategory[]
+  savings: SavingPot[]
+  leisurePlans: LeisurePlan[]
 }
 
 export interface SpendEntry {
@@ -237,6 +254,8 @@ export function emptyState(): AppState {
     },
     groceryInflows: [],
     customCategories: [],
+    savings: [],
+    leisurePlans: [],
   }
 }
 
