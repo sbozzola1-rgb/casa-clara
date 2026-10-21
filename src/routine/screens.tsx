@@ -474,7 +474,7 @@ export function SchoolScreen() {
             <TextInput value={draft.title} maxLength={60} onChange={(event) => setDraft({ ...draft, title: event.target.value })} />
           </Field>
           <Field label="Material da mochila">
-            <TextInput value={draft.materials} maxLength={120} placeholder="O que ela leva neste dia" onChange={(event) => setDraft({ ...draft, materials: event.target.value })} />
+            <TextInput value={draft.materials} maxLength={160} placeholder="O que ela leva neste dia" onChange={(event) => setDraft({ ...draft, materials: event.target.value })} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Começa">

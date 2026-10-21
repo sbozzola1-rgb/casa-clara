@@ -258,22 +258,22 @@ function lesson(id: string, title: string, emoji: string, start: string, end: st
 export function lauraSchool(): SchoolItem[] {
   return [
     lesson('laura-lanche', 'Lanche', '🍎', '14:50', '15:10', SCHOOL_DAYS, 'all'),
-    lesson('laura-seg-parque', 'Parque', '🌳', '16:40', '17:00', [1], 'all'),
-    lesson('laura-seg-ingles', 'Inglês', '💬', '17:10', '18:00', [1], 'all'),
-    lesson('laura-ter-edfisica', 'Educação física', '🏃', '16:20', '17:10', [2], 'all', 'Tênis'),
-    lesson('laura-qua-ingles', 'Inglês', '💬', '13:50', '14:40', [3], 'all'),
+    lesson('laura-seg-parque', 'Parque', '🌳', '16:40', '17:00', [1], 'all', 'Ir de crocs'),
+    lesson('laura-seg-ingles', 'Inglês', '💬', '17:10', '18:00', [1], 'all', 'Pegar o material de inglês'),
+    lesson('laura-ter-edfisica', 'Educação física', '🏃', '16:20', '17:10', [2], 'all', 'Ir de tênis'),
+    lesson('laura-qua-ingles', 'Inglês', '💬', '13:50', '14:40', [3], 'all', 'Pegar o material de inglês'),
     lesson('laura-qua-arte', 'Arte', '🎨', '16:20', '17:10', [3], 'all'),
-    lesson('laura-sex-brinquedo', 'Dia do brinquedo', '🧸', '17:10', '18:00', [5], 'all', 'Um brinquedo'),
-    lesson('laura-ter-natacao', 'Natação', '🏊', '13:00', '13:50', [2], 'swim', 'Maiô, touca e óculos'),
+    lesson('laura-sex-brinquedo', 'Dia do brinquedo', '🧸', '17:10', '18:00', [5], 'all', 'Brinquedo'),
+    lesson('laura-ter-natacao', 'Natação', '🏊', '13:00', '13:50', [2], 'swim', 'Maiô e touca da natação, óculos, toalha, chinelo e roupão'),
     lesson('laura-qua-linguagens', 'Avaliação de linguagens', '📝', '13:00', '13:50', [3], 'swim'),
     lesson('laura-qui-brincar', 'Brincar', '🎈', '13:50', '14:40', [4], 'swim'),
     lesson('laura-sex-lab', 'Laboratório de ciências', '🔬', '13:50', '14:40', [5], 'swim'),
-    lesson('laura-sex-parque', 'Parque', '🌳', '16:40', '17:00', [5], 'swim'),
+    lesson('laura-sex-parque', 'Parque', '🌳', '16:40', '17:00', [5], 'swim', 'Ir de crocs'),
     lesson('laura-ter-robotica', 'Robótica', '🤖', '13:00', '14:40', [2], 'robot'),
     lesson('laura-qua-ciencias', 'Avaliação de ciências', '🧪', '13:00', '13:50', [3], 'robot'),
-    lesson('laura-qui-biblioteca', 'Biblioteca', '📚', '13:50', '14:40', [4], 'robot'),
-    lesson('laura-qui-parque', 'Parque', '🌳', '16:40', '17:00', [4], 'robot'),
-    lesson('laura-sex-karate', 'Karatê / dança', '🥋', '16:20', '17:10', [5], 'robot', 'Roupa de karatê ou de dança'),
+    lesson('laura-qui-biblioteca', 'Biblioteca', '📚', '13:50', '14:40', [4], 'robot', 'Levar o livro'),
+    lesson('laura-qui-parque', 'Parque', '🌳', '16:40', '17:00', [4], 'robot', 'Ir de crocs'),
+    lesson('laura-sex-karate', 'Karatê / dança', '🥋', '16:20', '17:10', [5], 'robot', 'Roupa do balé'),
   ]
 }
 
@@ -478,7 +478,10 @@ export function sanitize(input: unknown): RoutineState {
         if (!title) return []
         const week = item.week === 'swim' || item.week === 'robot' ? item.week : 'all'
         const until = /^\d{4}-\d{2}-\d{2}$/.test(text(item.until)) ? text(item.until) : ''
-        const materials = typeof item.materials === 'string' ? text(item.materials).trim().slice(0, 120) : (seededMaterials.get(item.id) ?? '')
+        const stored = typeof item.materials === 'string' ? text(item.materials).trim().slice(0, 160) : ''
+        const official = seededMaterials.get(item.id) ?? ''
+        const previous = stored === '' || stored === 'Tênis' || stored === 'Um brinquedo' || stored === 'Maiô, touca e óculos' || stored === 'Roupa de karatê ou de dança'
+        const materials = official && previous ? official : stored
         return [{ id: item.id, title, emoji: emoji(item.emoji, '🎒'), start: clock(item.start, '07:30'), end: clock(item.end, ''), days: days(item.days, SCHOOL_DAYS), week, until, materials }]
       })
     : []
