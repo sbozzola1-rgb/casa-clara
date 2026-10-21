@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { CardDialog, PurchaseDialog } from '../components/dialogs.tsx'
 import { Button, EmptyState, PageIntro, Panel } from '../components/ui.tsx'
 import { formatFriendly, formatShort, monthKey, monthTitle, shiftMonth } from '../lib/dates.ts'
-import { billingMonthForDue, installmentSchedule, invoiceDueDate, invoiceForCard, limitUsed, openInvoiceMonth } from '../lib/finance.ts'
+import { billingMonthForDue, invoiceDueDate, invoiceForCard, limitUsed, openInvoiceMonth, type InvoiceLine } from '../lib/finance.ts'
 import { formatBRL, round2 } from '../lib/money.ts'
 import { cardPalette, categoryLabel, type CreditCard, type CustomCategory, type Purchase } from '../lib/types.ts'
 import { useStore } from '../state.tsx'
@@ -103,9 +103,13 @@ export function CardDetail({ cardId }: { cardId: string }) {
   const invoice = invoiceForCard(card, state.purchases, billing.year, billing.monthIndex, state.paidInvoices, state.companyEntries)
   const used = limitUsed(card, state, today)
   const palette = cardPalette(card.color)
-  const purchases = state.purchases
-    .filter((item) => item.cardId === card.id)
-    .sort((a, b) => b.date.localeCompare(a.date))
+  const purchases = state.purchases.filter((item) => item.cardId === card.id)
+  const avista = invoice.lines.filter((line) => line.installments <= 1)
+  const parceladas = invoice.lines.filter((line) => line.installments > 1)
+  const openPurchase = (line: InvoiceLine) => {
+    const found = purchases.find((item) => item.id === line.purchaseId)
+    if (found) setPurchase(found)
+  }
 
   return (
     <div>
@@ -170,40 +174,14 @@ export function CardDetail({ cardId }: { cardId: string }) {
             <p className="mt-1 text-sm text-ink-soft">
               Fecha {formatShort(invoice.closing)} · vence {formatShort(invoice.due)}
             </p>
-            {invoice.lines.length === 0 ? (
-              <p className="mt-6 text-sm text-ink-soft">Nada nesta fatura.</p>
-            ) : (
-              <ul className="mt-5 divide-y divide-line">
-                {invoice.lines.map((line) => (
-                  <li key={`${line.purchaseId}-${line.installment}`}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const found = state.purchases.find((item) => item.id === line.purchaseId)
-                        if (found) setPurchase(found)
-                      }}
-                      className="flex w-full items-center justify-between gap-3 py-3 text-left"
-                    >
-                      <span>
-                        <span className="block text-sm font-medium">{line.description}</span>
-                        <span className="block text-xs text-ink-soft">
-                          {formatFriendly(line.date, today)} · {categoryLabel(line.category, state.customCategories)}
-                          {line.installments > 1 ? ` · parcela ${line.installment} de ${line.installments}` : ''}
-                        </span>
-                      </span>
-                      <span className="tabular-nums">{formatBRL(line.amount)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            {invoice.lines.length === 0 ? <p className="mt-6 text-sm text-ink-soft">Nada nesta fatura.</p> : null}
           </Panel>
 
           <Panel title="À vista" className="mt-4">
-            <PurchaseList items={purchases.filter((item) => item.installments <= 1)} today={today} custom={state.customCategories} onOpen={setPurchase} empty="Nenhuma compra à vista neste cartão." />
+            <InvoiceLines lines={avista} today={today} custom={state.customCategories} onOpen={openPurchase} empty="Nenhuma compra à vista nesta fatura." />
           </Panel>
           <Panel title="Parceladas" className="mt-4">
-            <PurchaseList items={purchases.filter((item) => item.installments > 1)} today={today} custom={state.customCategories} onOpen={setPurchase} empty="Nenhuma compra parcelada neste cartão." />
+            <InvoiceLines lines={parceladas} today={today} custom={state.customCategories} onOpen={openPurchase} empty="Nenhuma parcela nesta fatura." />
           </Panel>
         </div>
       </div>
@@ -216,39 +194,36 @@ export function CardDetail({ cardId }: { cardId: string }) {
   )
 }
 
-function PurchaseList({
-  items,
+function InvoiceLines({
+  lines,
   today,
   custom,
   onOpen,
   empty,
 }: {
-  items: Purchase[]
+  lines: InvoiceLine[]
   today: Date
   custom: CustomCategory[]
-  onOpen: (item: Purchase) => void
+  onOpen: (line: InvoiceLine) => void
   empty: string
 }) {
-  if (items.length === 0) return <p className="text-sm text-ink-soft">{empty}</p>
+  if (lines.length === 0) return <p className="text-sm text-ink-soft">{empty}</p>
   return (
     <ul className="divide-y divide-line">
-      {items.map((item) => {
-        const parcela = installmentSchedule(item)[0]?.amount ?? item.amount
-        return (
-          <li key={item.id}>
-            <button type="button" onClick={() => onOpen(item)} className="flex w-full items-center justify-between gap-3 py-3 text-left">
-              <span>
-                <span className="block text-sm font-medium">{item.description}</span>
-                <span className="block text-xs text-ink-soft">
-                  {formatFriendly(item.date, today)} · {categoryLabel(item.category, custom)}
-                  {item.installments > 1 ? ` · ${item.installments}x · total ${formatBRL(item.amount)}` : ' · à vista'}
-                </span>
+      {lines.map((line) => (
+        <li key={`${line.purchaseId}-${line.installment}`}>
+          <button type="button" onClick={() => onOpen(line)} className="flex w-full items-center justify-between gap-3 py-3 text-left">
+            <span>
+              <span className="block text-sm font-medium">{line.description}</span>
+              <span className="block text-xs text-ink-soft">
+                {formatFriendly(line.date, today)} · {categoryLabel(line.category, custom)}
+                {line.installments > 1 ? ` · parcela ${line.installment} de ${line.installments}` : ' · à vista'}
               </span>
-              <span className="tabular-nums">{formatBRL(item.installments > 1 ? parcela : item.amount)}</span>
-            </button>
-          </li>
-        )
-      })}
+            </span>
+            <span className="tabular-nums">{formatBRL(line.amount)}</span>
+          </button>
+        </li>
+      ))}
     </ul>
   )
 }
