@@ -14,6 +14,7 @@ export default defineConfig({
       input: {
         main: resolve(root, 'index.html'),
         rotina: resolve(root, 'rotina.html'),
+        laura: resolve(root, 'laura.html'),
       },
     },
   },

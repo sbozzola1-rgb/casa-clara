@@ -17,17 +17,21 @@ export function doorOnLoad(): 'finance' | 'routine' {
 }
 
 function routineUrl() {
-  return new URL('rotina.html', new URL(import.meta.env.BASE_URL, location.origin)).href
+  return new URL('laura.html', new URL(import.meta.env.BASE_URL, location.origin)).href
+}
+
+function onRoutinePage() {
+  return location.pathname.endsWith('/laura.html') || location.pathname.endsWith('/rotina.html')
 }
 
 export function openRoutine() {
   sessionStorage.removeItem(SKIP_KEY)
-  if (!location.pathname.endsWith('/rotina.html')) location.assign(routineUrl())
+  if (!location.pathname.endsWith('/laura.html')) location.assign(routineUrl())
 }
 
 export function leaveRoutine() {
   sessionStorage.setItem(SKIP_KEY, '1')
-  if (location.pathname.endsWith('/rotina.html')) location.assign(new URL(import.meta.env.BASE_URL, location.origin).href)
+  if (onRoutinePage()) location.assign(new URL(import.meta.env.BASE_URL, location.origin).href)
 }
 
 export function routinePinned() {

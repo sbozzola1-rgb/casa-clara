@@ -1,7 +1,7 @@
 {
   "name": "Rotina da Casa Clara",
   "short_name": "Rotina",
-  "start_url": "./rotina.html",
+  "start_url": "./laura.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#fff7fb",

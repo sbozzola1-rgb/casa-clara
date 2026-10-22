@@ -13,7 +13,7 @@ self.addEventListener('notificationclick', (event) => {
       for (const client of clients) {
         if ('focus' in client) return client.focus()
       }
-      return self.clients.openWindow('./rotina.html')
+      return self.clients.openWindow('./laura.html')
     }),
   )
 })
