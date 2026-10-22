@@ -189,6 +189,7 @@ export interface CompanyEntry {
   cardId: string | null
   installments: number
   purchaseId: string | null
+  repeat: 'once' | 'monthly'
 }
 
 export interface SavingPot {

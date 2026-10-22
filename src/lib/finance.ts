@@ -13,6 +13,40 @@ export function companyOnCard(entry: CompanyEntry): boolean {
   return entry.direction === 'saida' && entry.method === 'cartao' && Boolean(entry.cardId)
 }
 
+export function companyOccursInMonth(entry: { date: string; repeat?: 'once' | 'monthly' }, month: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.date)) return false
+  if (entry.repeat !== 'monthly') {
+    const { start, end } = monthRange(month)
+    return inRange(parseDate(entry.date), start, end)
+  }
+  const { year, monthIndex } = parseMonthKey(month)
+  const when = parseDate(entry.date)
+  const start = when.getFullYear() * 12 + when.getMonth()
+  const target = year * 12 + monthIndex
+  return target >= start
+}
+
+export function companyOccurrenceDate(entry: { date: string; repeat?: 'once' | 'monthly' }, month: string): string {
+  if (entry.repeat !== 'monthly') return entry.date
+  const { year, monthIndex } = parseMonthKey(month)
+  return formatISO(dateOn(year, monthIndex, parseDate(entry.date).getDate()))
+}
+
+function monthlyChargeOnBill(entry: CompanyEntry, year: number, monthIndex: number, closingDay: number): string | null {
+  if (entry.repeat !== 'monthly') return null
+  const day = parseDate(entry.date).getDate()
+  const previous = new Date(year, monthIndex - 1, 1)
+  const candidates = [dateOn(year, monthIndex, day), dateOn(previous.getFullYear(), previous.getMonth(), day)]
+  for (const when of candidates) {
+    const bill = invoiceMonthFor(when, closingDay)
+    if (bill.year !== year || bill.monthIndex !== monthIndex) continue
+    const month = monthKey(when)
+    if (!companyOccursInMonth(entry, month)) continue
+    return formatISO(when)
+  }
+  return null
+}
+
 export interface InvoiceLine {
   purchaseId: string
   description: string
@@ -106,9 +140,25 @@ export function invoiceForCard(
   companyEntries: CompanyEntry[] = [],
 ): Invoice {
   const lines: InvoiceLine[] = []
+  for (const entry of companyEntries) {
+    if (!companyOnCard(entry) || entry.cardId !== card.id || entry.repeat !== 'monthly') continue
+    const when = monthlyChargeOnBill(entry, year, monthIndex, card.closingDay)
+    if (!when) continue
+    const linked = purchases.find((item) => item.id === entry.purchaseId)
+    if (linked && linked.date.slice(0, 7) === when.slice(0, 7)) continue
+    lines.push({
+      purchaseId: entry.id,
+      description: entry.description,
+      category: entry.category,
+      date: when,
+      amount: entry.amount,
+      installment: 1,
+      installments: 1,
+    })
+  }
   const sources: Purchase[] = [
     ...purchases,
-    ...companyEntries.filter((entry) => companyOnCard(entry) && entry.cardId === card.id && !purchases.some((item) => item.id === entry.purchaseId)).map((entry) => ({
+    ...companyEntries.filter((entry) => companyOnCard(entry) && entry.cardId === card.id && entry.repeat !== 'monthly' && !purchases.some((item) => item.id === entry.purchaseId)).map((entry) => ({
       id: entry.id,
       cardId: entry.cardId ?? '',
       description: entry.description,
@@ -162,7 +212,7 @@ export function invoicesDueInMonth(state: AppState, month: string): Invoice[] {
   return invoices.sort((a, b) => a.due.getTime() - b.due.getTime())
 }
 
-export function limitUsed(card: CreditCard, state: AppState, _today: Date): number {
+export function limitUsed(card: CreditCard, state: AppState, today: Date): number {
   let total = 0
   for (const purchase of state.purchases) {
     if (purchase.cardId !== card.id) continue
@@ -172,8 +222,30 @@ export function limitUsed(card: CreditCard, state: AppState, _today: Date): numb
       total += installment.amount
     }
   }
+  const openBill = openInvoiceMonth(today, card.closingDay)
+  const openIndex = openBill.year * 12 + openBill.monthIndex
   for (const entry of state.companyEntries) {
-    if (!companyOnCard(entry) || entry.cardId !== card.id || state.purchases.some((item) => item.id === entry.purchaseId)) continue
+    if (!companyOnCard(entry) || entry.cardId !== card.id) continue
+    if (entry.repeat === 'monthly') {
+      const start = parseDate(entry.date)
+      let cursor = start.getFullYear() * 12 + start.getMonth()
+      while (cursor <= openIndex + 1) {
+        const year = Math.floor(cursor / 12)
+        const monthIndex = cursor % 12
+        const month = monthKey(new Date(year, monthIndex, 1))
+        if (companyOccursInMonth(entry, month)) {
+          const when = parseDate(companyOccurrenceDate(entry, month))
+          const bill = invoiceMonthFor(when, card.closingDay)
+          const billIndex = bill.year * 12 + bill.monthIndex
+          const linked = state.purchases.find((item) => item.id === entry.purchaseId)
+          const samePurchaseMonth = linked && linked.date.slice(0, 7) === month
+          if (!samePurchaseMonth && billIndex <= openIndex && !state.paidInvoices[invoiceKey(card.id, bill.year, bill.monthIndex)]) total += entry.amount
+        }
+        cursor += 1
+      }
+      continue
+    }
+    if (state.purchases.some((item) => item.id === entry.purchaseId)) continue
     for (const installment of installmentSchedule({ amount: entry.amount, installments: entry.installments, date: entry.date })) {
       const bill = invoiceMonthFor(installment.date, card.closingDay)
       if (state.paidInvoices[invoiceKey(card.id, bill.year, bill.monthIndex)]) continue
@@ -413,8 +485,7 @@ export function peopleIncome(state: AppState, month: string) {
 }
 
 export function companyInMonth(state: AppState, month: string) {
-  const { start, end } = monthRange(month)
-  const entries = state.companyEntries.filter((entry) => inRange(parseDate(entry.date), start, end))
+  const entries = state.companyEntries.filter((entry) => companyOccursInMonth(entry, month))
   const entradas = round2(entries.filter((entry) => entry.direction === 'entrada').reduce((sum, entry) => sum + entry.amount, 0))
   const saidas = round2(entries.filter((entry) => entry.direction === 'saida').reduce((sum, entry) => sum + entry.amount, 0))
   return { entries, entradas, saidas }

@@ -135,6 +135,7 @@ export function sanitize(input: unknown): AppState | null {
                 cardId: cardId.length > 0 ? cardId : null,
                 installments: cardId.length > 0 ? Math.min(24, Math.max(1, Math.round(Number(item.installments)) || 1)) : 1,
                 purchaseId: text(item.purchaseId).trim() || null,
+                repeat: item.repeat === 'monthly' ? 'monthly' : 'once',
               },
             ]
           })

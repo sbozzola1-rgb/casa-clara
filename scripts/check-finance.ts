@@ -1,5 +1,5 @@
 import { addMonthsClamped, parseDate, startOfWeek } from '../src/lib/dates.ts'
-import { billingMonthForDue, fuelGoal, groceryGoal, installmentSchedule, invoiceDueDate, invoiceForCard, invoiceMonthFor, limitUsed, monthFlow, monthReport, overdueItems, spendEntries, spentInRange } from '../src/lib/finance.ts'
+import { billingMonthForDue, companyInMonth, fuelGoal, groceryGoal, installmentSchedule, invoiceDueDate, invoiceForCard, invoiceMonthFor, limitUsed, monthFlow, monthReport, overdueItems, spendEntries, spentInRange } from '../src/lib/finance.ts'
 import { sanitize } from '../src/lib/storage.ts'
 import { emptyState, type AppState, type CreditCard, type Purchase } from '../src/lib/types.ts'
 
@@ -156,6 +156,20 @@ const linked = {
   companyEntries: [{ ...companyCard.companyEntries[0], purchaseId: 'ja-no-cartao' }],
 }
 assert(invoiceForCard(card, linked.purchases, 2026, 10, {}, linked.companyEntries).total === 300, 'compra vinculada não entra duas vezes na fatura')
+
+const recurring = {
+  ...emptyState(),
+  cards: [card],
+  companyEntries: [{ id: 'saas', direction: 'saida' as const, description: 'Cursor', amount: 120, date: '2026-10-03', category: 'Serviço', method: 'cartao' as const, cardId: 'card-1', installments: 1, purchaseId: null, repeat: 'monthly' as const }],
+}
+assert(companyInMonth(recurring, '2026-09').saidas === 0, 'recorrente não volta para antes da data')
+assert(companyInMonth(recurring, '2026-10').saidas === 120 && companyInMonth(recurring, '2026-12').saidas === 120, 'recorrente aparece no mês inicial e nos seguintes')
+assert(invoiceForCard(card, [], 2026, 8, {}, recurring.companyEntries).total === 0, 'recorrente não entra na fatura anterior')
+assert(invoiceForCard(card, [], 2026, 9, {}, recurring.companyEntries).total === 120, 'recorrente entra na fatura do mês inicial')
+assert(invoiceForCard(card, [], 2026, 10, {}, recurring.companyEntries).total === 120, 'recorrente entra na fatura do mês seguinte')
+assert(limitUsed(card, recurring, parseDate('2026-10-20')) === 240, 'recorrente ocupa o limite até a fatura aberta')
+const recurringPaid = { ...recurring, paidInvoices: { 'card-1:2026-10': true as const } }
+assert(limitUsed(card, recurringPaid, parseDate('2026-10-20')) === 120, 'fatura paga libera a ocorrência daquele mês')
 
 const late = overdueItems(household, parseDate('2026-10-20'))
 assert(late.some((item) => item.expenseId === 'aluguel' && item.month === '2026-10'), 'aluguel de outubro vencido entra na gestão')

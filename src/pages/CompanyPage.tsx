@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { CompanyDialog, LinkLaunchDialog } from '../components/dialogs.tsx'
 import { Button, EmptyState, FlowChart, PageIntro, Panel } from '../components/ui.tsx'
 import { formatFriendly, monthTitle } from '../lib/dates.ts'
-import { companyInMonth, companyOnCard, flowSeries } from '../lib/finance.ts'
+import { companyInMonth, companyOccurrenceDate, companyOnCard, flowSeries } from '../lib/finance.ts'
 import { formatBRL, round2 } from '../lib/money.ts'
 import { COMPANY_PAYMENTS, type CompanyEntry } from '../lib/types.ts'
 import { useStore } from '../state.tsx'
@@ -51,14 +51,15 @@ export function CompanyPage() {
           ) : (
             <ul className="divide-y divide-line">
               {[...company.entries]
-                .sort((a, b) => b.date.localeCompare(a.date))
+                .sort((a, b) => companyOccurrenceDate(b, month).localeCompare(companyOccurrenceDate(a, month)))
                 .map((entry) => (
                   <li key={entry.id}>
                     <button type="button" onClick={() => setEditing(entry)} className="flex w-full items-center justify-between gap-3 py-3 text-left">
                       <span>
                         <span className="block text-sm font-medium">{entry.description}</span>
                         <span className="block text-xs text-ink-soft">
-                          {formatFriendly(entry.date, today)} · {entry.category} · {entry.direction === 'entrada' ? 'Entrada' : 'Saída'} · {companyPaymentLabel(entry, state.cards)}
+                          {formatFriendly(companyOccurrenceDate(entry, month), today)} · {entry.category} · {entry.direction === 'entrada' ? 'Entrada' : 'Saída'} · {companyPaymentLabel(entry, state.cards)}
+                          {entry.repeat === 'monthly' ? ' · Todo mês' : ''}
                         </span>
                       </span>
                       <span className={`font-medium tabular-nums ${entry.direction === 'entrada' ? 'text-moss' : 'text-clay'}`}>

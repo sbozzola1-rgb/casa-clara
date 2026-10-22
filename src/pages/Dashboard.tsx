@@ -3,7 +3,7 @@ import { IncomeDialog } from '../components/dialogs.tsx'
 import { ExpenseMark } from '../components/ExpenseIcon.tsx'
 import { BudgetMeter, Button, FlowChart, Panel, ToneBadge, toneLabel } from '../components/ui.tsx'
 import { dateOn, dueTone, formatShort, monthRange, monthTitle, parseMonthKey, startOfWeek, weekTitle } from '../lib/dates.ts'
-import { companyOnCard, fixedApplies, fixedCardPurchaseId, fixedKey, flowSeries, fuelGoal, groceryGoal, invoiceForCard, invoicesDueInMonth, limitUsed, monthFlow, openInvoiceMonth, overdueItems, spentInRange, variableSpending } from '../lib/finance.ts'
+import { fixedApplies, fixedCardPurchaseId, fixedKey, flowSeries, fuelGoal, groceryGoal, invoiceForCard, invoicesDueInMonth, limitUsed, monthFlow, openInvoiceMonth, overdueItems, spentInRange, variableSpending } from '../lib/finance.ts'
 import { formatBRL, round2 } from '../lib/money.ts'
 import { useStore } from '../state.tsx'
 
@@ -24,6 +24,7 @@ export function Dashboard() {
   const slices = variableSpending(state, month)
   const peak = Math.max(1, ...slices.map((item) => item.amount))
   const leftover = flow.hasIncome ? flow.leftover : null
+  const companyNet = round2(flow.company.entradas - flow.company.saidas)
   const late = overdueItems(state, today)
   const lateTotal = round2(late.reduce((sum, item) => sum + item.amount, 0))
   const series = flowSeries(state, month)
@@ -114,15 +115,8 @@ export function Dashboard() {
         <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <HeroChip label="Gastos fixos" value={formatBRL(report.fixedTotal)} />
           <HeroChip label="Faturas do mês" value={formatBRL(report.invoiceTotal)} />
-          <HeroChip label="Pix, débito e dinheiro" value={formatBRL(report.cashTotal)} />
-          <HeroChip
-            label="Saídas da empresa"
-            value={formatBRL(
-              flow.company.entries
-                .filter((entry) => entry.direction === 'saida' && !companyOnCard(entry))
-                .reduce((sum, entry) => sum + entry.amount, 0),
-            )}
-          />
+          <HeroChip label="À vista da casa" hint="Mercado, lazer e combustível fora do cartão" value={formatBRL(report.cashTotal)} />
+          <HeroChip label="Líquido da empresa" hint="Entradas menos saídas" value={formatBRL(companyNet)} />
         </div>
       </section>
 
@@ -319,10 +313,11 @@ export function Dashboard() {
   )
 }
 
-function HeroChip({ label, value }: { label: string; value: string }) {
+function HeroChip({ label, hint, value }: { label: string; hint?: string; value: string }) {
   return (
     <div className="rounded-2xl bg-white/10 px-4 py-3">
       <p className="text-xs text-white/60">{label}</p>
+      {hint ? <p className="mt-1 text-[11px] leading-snug text-white/45">{hint}</p> : null}
       <p className="mt-1 font-serif text-2xl tabular-nums">{value}</p>
     </div>
   )

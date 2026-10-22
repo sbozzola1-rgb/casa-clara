@@ -1203,6 +1203,7 @@ export function LinkLaunchDialog({ onClose }: { onClose: () => void }) {
                         cardId: purchase.cardId,
                         installments: purchase.installments,
                         purchaseId: purchase.id,
+                        repeat: 'once',
                       })
                       onClose()
                     }}
@@ -1236,6 +1237,7 @@ export function CompanyDialog({ entry, onClose }: { entry: CompanyEntry | null; 
   const [method, setMethod] = useState<CompanyPayment>(entry?.method ?? 'pix')
   const [cardId, setCardId] = useState(entry?.cardId ?? state.cards[0]?.id ?? '')
   const [installments, setInstallments] = useState(String(entry?.installments ?? 1))
+  const [repeat, setRepeat] = useState<'once' | 'monthly'>(entry?.repeat ?? 'once')
   const [error, setError] = useState('')
   const [confirming, setConfirming] = useState(false)
 
@@ -1259,7 +1261,7 @@ export function CompanyDialog({ entry, onClose }: { entry: CompanyEntry | null; 
       return
     }
     const count = Math.round(Number(installments))
-    if (payByCard && (!Number.isInteger(count) || count < 1 || count > 24)) {
+    if (payByCard && repeat === 'once' && (!Number.isInteger(count) || count < 1 || count > 24)) {
       setError('As parcelas vão de 1 a 24.')
       return
     }
@@ -1272,8 +1274,9 @@ export function CompanyDialog({ entry, onClose }: { entry: CompanyEntry | null; 
       category,
       method,
       cardId: payByCard ? cardId : null,
-      installments: payByCard ? count : 1,
+      installments: payByCard && repeat === 'once' ? count : 1,
       purchaseId: payByCard ? (entry?.purchaseId ?? null) : null,
+      repeat,
     })
     onClose()
   }
@@ -1333,9 +1336,30 @@ export function CompanyDialog({ entry, onClose }: { entry: CompanyEntry | null; 
           <Field label="Descrição">
             <input autoFocus className={fieldClass} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Ex.: Cliente ou fornecedor" />
           </Field>
-          <MoneyField label="Valor" value={amount} onChange={setAmount} />
+          <MoneyField label={repeat === 'monthly' ? 'Valor mensal' : 'Valor'} value={amount} onChange={setAmount} />
+          <div>
+            <span className="mb-1.5 block text-sm font-medium text-ink">Quando acontece</span>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                aria-pressed={repeat === 'once'}
+                onClick={() => setRepeat('once')}
+                className={`h-10 rounded-xl border text-sm font-medium ${repeat === 'once' ? 'border-moss bg-moss-soft text-moss' : 'border-line bg-card'}`}
+              >
+                Só nesta data
+              </button>
+              <button
+                type="button"
+                aria-pressed={repeat === 'monthly'}
+                onClick={() => setRepeat('monthly')}
+                className={`h-10 rounded-xl border text-sm font-medium ${repeat === 'monthly' ? 'border-moss bg-moss-soft text-moss' : 'border-line bg-card'}`}
+              >
+                Todo mês
+              </button>
+            </div>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Data">
+            <Field label={repeat === 'monthly' ? 'A partir de' : 'Data'} hint={repeat === 'monthly' ? 'Entra neste mês e nos seguintes, no mesmo dia.' : undefined}>
               <input type="date" className={fieldClass} value={date} onChange={(event) => setDate(event.target.value)} />
             </Field>
             <Field label="Categoria">
@@ -1356,10 +1380,14 @@ export function CompanyDialog({ entry, onClose }: { entry: CompanyEntry | null; 
             </select>
           </Field>
           {direction === 'saida' && method === 'cartao' ? (
-            <p className="text-xs leading-relaxed text-ink-soft">Esse valor entra na fatura do cartão. Na conta da casa ele sai no mês da fatura, uma vez só.</p>
+            <p className="text-xs leading-relaxed text-ink-soft">
+              {repeat === 'monthly'
+                ? 'Todo mês esse valor entra na fatura do ciclo daquele dia. Na conta da casa ele sai no mês de cada fatura.'
+                : 'Esse valor entra na fatura do cartão. Na conta da casa ele sai no mês da fatura, uma vez só.'}
+            </p>
           ) : null}
           {direction === 'saida' && method === 'cartao' ? (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className={`grid gap-4 ${repeat === 'once' ? 'sm:grid-cols-2' : ''}`}>
               <Field label="Cartão">
                 <select className={fieldClass} value={cardId} onChange={(event) => setCardId(event.target.value)}>
                   {state.cards.length === 0 ? <option value="">Nenhum cartão</option> : null}
@@ -1370,9 +1398,11 @@ export function CompanyDialog({ entry, onClose }: { entry: CompanyEntry | null; 
                   ))}
                 </select>
               </Field>
-              <Field label="Parcelas">
-                <input className={fieldClass} inputMode="numeric" value={installments} onChange={(event) => setInstallments(event.target.value)} />
-              </Field>
+              {repeat === 'once' ? (
+                <Field label="Parcelas">
+                  <input className={fieldClass} inputMode="numeric" value={installments} onChange={(event) => setInstallments(event.target.value)} />
+                </Field>
+              ) : null}
             </div>
           ) : null}
           {error ? <p className="text-sm text-clay">{error}</p> : null}
