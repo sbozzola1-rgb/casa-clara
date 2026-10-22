@@ -25,6 +25,18 @@ export function Dashboard() {
   const peak = Math.max(1, ...slices.map((item) => item.amount))
   const leftover = flow.hasIncome ? flow.leftover : null
   const companyNet = round2(flow.company.entradas - flow.company.saidas)
+  const fixedOnCard = round2(
+    state.fixedExpenses
+      .filter((expense) => fixedApplies(expense, month))
+      .reduce((sum, expense) => sum + (state.purchases.some((item) => item.id === fixedCardPurchaseId(expense.id, month)) ? expense.amount : 0), 0),
+  )
+  const fixedCounted = round2(report.fixedTotal - fixedOnCard)
+  const outflowPieces = [
+    { label: 'Fixos', value: fixedCounted },
+    { label: 'Cartões', value: report.invoiceTotal },
+    { label: 'À vista', value: report.cashTotal },
+    { label: 'Empresa, fora do cartão', value: flow.companyCash },
+  ].filter((piece) => piece.value > 0)
   const late = overdueItems(state, today)
   const lateTotal = round2(late.reduce((sum, item) => sum + item.amount, 0))
   const series = flowSeries(state, month)
@@ -97,6 +109,24 @@ export function Dashboard() {
             <p className="mt-2 font-serif text-5xl tracking-tight tabular-nums">
               {formatBRL(leftover == null ? report.outflow : Math.abs(leftover))}
             </p>
+            {outflowPieces.length > 0 ? (
+              <div className="mt-4 max-w-sm">
+                <p className="text-xs font-semibold tracking-[0.16em] text-white/50 uppercase">O que sai</p>
+                <ul className="mt-2 space-y-1.5">
+                  {outflowPieces.map((piece) => (
+                    <li key={piece.label} className="flex items-baseline justify-between gap-6 text-sm text-white/80">
+                      <span>{piece.label}</span>
+                      <span className="font-medium tabular-nums text-white">{formatBRL(piece.value)}</span>
+                    </li>
+                  ))}
+                </ul>
+                {fixedOnCard > 0 ? (
+                  <p className="mt-2 text-xs leading-relaxed text-white/50">
+                    {formatBRL(fixedOnCard)} de fixo foi lançado no cartão e já está dentro dos cartões.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
             <p className="mt-3 text-sm text-white/75">
               {flow.hasIncome
                 ? `Entra ${formatBRL(flow.income)} · sai ${formatBRL(flow.expense)} · em aberto ${formatBRL(report.stillOpen)}`

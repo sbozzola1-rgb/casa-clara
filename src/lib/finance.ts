@@ -505,6 +505,7 @@ export function monthFlow(state: AppState, month: string) {
   return {
     people,
     company,
+    companyCash,
     report,
     income,
     expense,
