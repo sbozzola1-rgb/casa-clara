@@ -352,6 +352,9 @@ export interface MonthReport {
   fixedTotal: number
   fixedPaid: number
   fixedOpen: number
+  additionalTotal: number
+  additionalPaid: number
+  additionalOpen: number
   invoiceTotal: number
   invoicePaid: number
   invoiceOpen: number
@@ -362,7 +365,7 @@ export interface MonthReport {
 
 export interface OverdueItem {
   key: string
-  kind: 'fixed' | 'invoice'
+  kind: 'fixed' | 'additional' | 'invoice'
   title: string
   detail: string
   icon?: string
@@ -373,6 +376,25 @@ export interface OverdueItem {
   cardId?: string
   year?: number
   monthIndex?: number
+}
+
+function monthSerial(date: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null
+  const when = parseDate(date)
+  return when.getFullYear() * 12 + when.getMonth()
+}
+
+export function additionalKey(id: string, month: string) {
+  return `${id}:${month}`
+}
+
+export function additionalApplies(expense: { startDate: string; endDate: string }, month: string): boolean {
+  const start = monthSerial(expense.startDate)
+  const end = monthSerial(expense.endDate)
+  if (start == null || end == null || end < start) return false
+  const { year, monthIndex } = parseMonthKey(month)
+  const target = year * 12 + monthIndex
+  return target >= start && target <= end
 }
 
 export function fixedApplies(expense: { active: boolean; startDate?: string | null }, month: string): boolean {
@@ -402,6 +424,21 @@ export function overdueItems(state: AppState, today: Date): OverdueItem[] {
         title: expense.name,
         detail: expense.category,
         icon: expense.icon,
+        amount: expense.amount,
+        due,
+        month: key,
+        expenseId: expense.id,
+      })
+    }
+    for (const expense of state.additionalExpenses ?? []) {
+      if (!additionalApplies(expense, key) || expense.amount <= 0 || state.paidAdditional?.[additionalKey(expense.id, key)]) continue
+      const due = dateOn(year, monthIndex, expense.dueDay)
+      if (startOfDay(due).getTime() >= todayStart) continue
+      items.push({
+        key: `additional:${expense.id}:${key}`,
+        kind: 'additional',
+        title: expense.name,
+        detail: 'Gasto adicional',
         amount: expense.amount,
         due,
         month: key,
@@ -453,17 +490,25 @@ export function monthReport(state: AppState, month: string): MonthReport {
       0,
     ),
   )
-  const outflow = round2(fixedTotal - onCard + invoiceTotal + cashTotal)
+  const extras = (state.additionalExpenses ?? []).filter((expense) => additionalApplies(expense, month))
+  const additionalTotal = round2(extras.reduce((sum, expense) => sum + expense.amount, 0))
+  const additionalPaid = round2(
+    extras.reduce((sum, expense) => sum + (state.paidAdditional?.[additionalKey(expense.id, month)] ? expense.amount : 0), 0),
+  )
+  const outflow = round2(fixedTotal - onCard + additionalTotal + invoiceTotal + cashTotal)
   return {
     fixedTotal,
     fixedPaid,
     fixedOpen: round2(fixedTotal - fixedPaid),
+    additionalTotal,
+    additionalPaid,
+    additionalOpen: round2(additionalTotal - additionalPaid),
     invoiceTotal,
     invoicePaid,
     invoiceOpen: round2(invoiceTotal - invoicePaid),
     cashTotal,
     outflow,
-    stillOpen: round2(fixedTotal - fixedPaid + (invoiceTotal - invoicePaid)),
+    stillOpen: round2(fixedTotal - fixedPaid + (additionalTotal - additionalPaid) + (invoiceTotal - invoicePaid)),
   }
 }
 

@@ -9,7 +9,7 @@ import type { FixedExpense } from '../lib/types.ts'
 import { useStore } from '../state.tsx'
 
 export function OverduePage() {
-  const { state, today, payFixed, toggleInvoicePaid } = useStore()
+  const { state, today, payFixed, setAdditionalPaid, toggleInvoicePaid } = useStore()
   const [paying, setPaying] = useState<{ expense: FixedExpense; month: string } | null>(null)
   const items = overdueItems(state, today)
   const total = round2(items.reduce((sum, item) => sum + item.amount, 0))
@@ -22,6 +22,7 @@ export function OverduePage() {
       if (state.cards.length === 0) payFixed(expense.id, item.month, null)
       else setPaying({ expense, month: item.month })
     }
+    if (item.kind === 'additional' && item.expenseId) setAdditionalPaid(item.expenseId, item.month, true)
     if (item.kind === 'invoice' && item.cardId != null && item.year != null && item.monthIndex != null) {
       toggleInvoicePaid(item.cardId, item.year, item.monthIndex)
     }

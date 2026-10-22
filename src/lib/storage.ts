@@ -1,4 +1,4 @@
-import { emptyState, CARD_COLORS, COMPANY_CATEGORIES, COMPANY_PAYMENTS, FIXED_ICONS, iconForCategory, PAYMENT_METHODS, PEOPLE, SPEND_CATEGORIES, type AppState, type CardColorId, type CompanyDirection, type CompanyPayment, type CustomCategory, type FixedIconId, type GroceryInflow, type IncomeSource, type LeisurePlan, type PaymentMethod, type Person, type SavingPot } from './types.ts'
+import { emptyState, CARD_COLORS, COMPANY_CATEGORIES, COMPANY_PAYMENTS, FIXED_ICONS, iconForCategory, PAYMENT_METHODS, PEOPLE, SPEND_CATEGORIES, type AppState, type CardColorId, type CompanyDirection, type CompanyPayment, type CustomCategory, type FixedIconId, type AdditionalExpense, type GroceryInflow, type HouseTask, type IncomeSource, type LeisurePlan, type PaymentMethod, type Person, type SavingPot } from './types.ts'
 
 const KEY = 'casa-clara.v1'
 const spendIds = new Set<string>(SPEND_CATEGORIES.map((item) => item.id))
@@ -159,6 +159,7 @@ export function sanitize(input: unknown): AppState | null {
             }
           })
       : [],
+    additionalExpenses: readAdditional(source.additionalExpenses),
     cards: Array.isArray(source.cards)
       ? source.cards
           .filter((item) => item && typeof item === 'object' && typeof item.id === 'string')
@@ -206,6 +207,7 @@ export function sanitize(input: unknown): AppState | null {
       : [],
     groceryInflows,
     paidFixed: flagMap(source.paidFixed),
+    paidAdditional: flagMap(source.paidAdditional),
     paidInvoices: flagMap(source.paidInvoices),
     goals: {
       leisureWeeklyMax: numberOrNull(goals.leisureWeeklyMax),
@@ -217,6 +219,7 @@ export function sanitize(input: unknown): AppState | null {
     customCategories,
     savings: readSavings(source.savings),
     leisurePlans: readLeisurePlans(source.leisurePlans),
+    tasks: readTasks(source.tasks),
   }
 }
 
@@ -232,6 +235,27 @@ function readSavings(value: unknown): SavingPot[] {
   })
 }
 
+function readAdditional(value: unknown): AdditionalExpense[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object' || typeof item.id !== 'string') return []
+    const name = text(item.name).trim()
+    const amount = numberOrNull(item.amount)
+    const startDate = text(item.startDate)
+    const endDate = text(item.endDate)
+    if (!name || amount == null || amount <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return []
+    return [{
+      id: item.id,
+      name,
+      amount,
+      dueDay: Math.min(31, Math.max(1, Math.round(Number(item.dueDay)) || 1)),
+      startDate,
+      endDate,
+      notes: text(item.notes).trim(),
+    }]
+  })
+}
+
 function readLeisurePlans(value: unknown): LeisurePlan[] {
   if (!Array.isArray(value)) return []
   return value.flatMap((item) => {
@@ -241,6 +265,16 @@ function readLeisurePlans(value: unknown): LeisurePlan[] {
     const amount = numberOrNull(item.amount)
     if (!name || !/^\d{4}-\d{2}-\d{2}$/.test(date) || amount == null || amount <= 0) return []
     return [{ id: item.id, name, date, amount, note: text(item.note).trim() }]
+  })
+}
+
+function readTasks(value: unknown): HouseTask[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object' || typeof item.id !== 'string') return []
+    const title = text(item.title).trim()
+    if (!title) return []
+    return [{ id: item.id, title, note: text(item.note).trim(), done: item.done === true }]
   })
 }
 

@@ -4,10 +4,12 @@ import { attentionCount } from './lib/finance.ts'
 import { CardDetail, CardsPage } from './pages/CardsPage.tsx'
 import { CompanyPage } from './pages/CompanyPage.tsx'
 import { Dashboard } from './pages/Dashboard.tsx'
+import { AdditionalPage } from './pages/AdditionalPage.tsx'
 import { FixedPage } from './pages/FixedPage.tsx'
 import { GoalsPage } from './pages/GoalsPage.tsx'
 import { OverduePage } from './pages/OverduePage.tsx'
 import { PlansPage, SavingsPage } from './pages/CouplePages.tsx'
+import { TodoPage } from './pages/TodoPage.tsx'
 import { FuelPage, GroceryPage, LeisurePage } from './pages/SpendingPages.tsx'
 import { HouseGate } from './auth.tsx'
 import { CoupleMark, ThemeToggle } from './components/Brand.tsx'
@@ -15,14 +17,16 @@ import { signOut } from './lib/cloud.ts'
 import { openRoutine } from './routine/door.ts'
 import { StoreProvider, useStore, type Page } from './state.tsx'
 
-const NAV: { id: Page['id']; label: string; icon: 'home' | 'late' | 'fixed' | 'card' | 'market' | 'leisure' | 'fuel' | 'company' | 'goal' | 'saving' | 'plan' }[] = [
+const NAV: { id: Page['id']; label: string; icon: 'home' | 'late' | 'fixed' | 'extra' | 'card' | 'market' | 'leisure' | 'fuel' | 'company' | 'goal' | 'saving' | 'plan' | 'todo' }[] = [
   { id: 'dashboard', label: 'Início', icon: 'home' },
   { id: 'overdue', label: 'Vencidas', icon: 'late' },
   { id: 'fixed', label: 'Fixos', icon: 'fixed' },
+  { id: 'additional', label: 'Adicionais', icon: 'extra' },
   { id: 'cards', label: 'Cartões', icon: 'card' },
   { id: 'grocery', label: 'Mercado', icon: 'market' },
   { id: 'leisure', label: 'Lazer', icon: 'leisure' },
   { id: 'plans', label: 'Planos', icon: 'plan' },
+  { id: 'todo', label: 'To do', icon: 'todo' },
   { id: 'savings', label: 'Economias', icon: 'saving' },
   { id: 'fuel', label: 'Combustível', icon: 'fuel' },
   { id: 'company', label: 'Empresa', icon: 'company' },
@@ -135,6 +139,7 @@ function Shell() {
           {page.id === 'dashboard' ? <Dashboard /> : null}
           {page.id === 'overdue' ? <OverduePage /> : null}
           {page.id === 'fixed' ? <FixedPage /> : null}
+          {page.id === 'additional' ? <AdditionalPage /> : null}
           {page.id === 'cards' ? <CardsPage /> : null}
           {page.id === 'card' ? <CardDetail key={`${page.cardId}:${page.dueMonth ?? ''}`} cardId={page.cardId} initialDueMonth={page.dueMonth} /> : null}
           {page.id === 'grocery' ? <GroceryPage key={page.compose ? 'compose' : 'grocery'} /> : null}
@@ -144,6 +149,7 @@ function Shell() {
           {page.id === 'goals' ? <GoalsPage /> : null}
           {page.id === 'savings' ? <SavingsPage /> : null}
           {page.id === 'plans' ? <PlansPage /> : null}
+          {page.id === 'todo' ? <TodoPage /> : null}
         </main>
       </div>
 
@@ -206,6 +212,7 @@ function NavIcon({ name }: { name: (typeof NAV)[number]['icon'] }) {
   if (name === 'home') return <HomeIcon />
   if (name === 'late') return <Icon path="M10 3.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM10 6.5V10l2.2 1.4" />
   if (name === 'fixed') return <Icon path="M3 6.5h14M3 10h14M3 13.5h10" />
+  if (name === 'extra') return <Icon path="M4 5.5h12v11H4v-11Zm0 3h12M8 3.5v3M12 3.5v3" />
   if (name === 'card') return <Icon path="M3 6.5h14v8H3v-8Zm0 3h14" />
   if (name === 'market') return <Icon path="M4 8h12l-1 7H5L4 8Zm2-2.5a4 4 0 0 1 8 0" />
   if (name === 'leisure') return <Icon path="M4 13.5 8 4l2 5 2-2 4 6.5" />
@@ -213,6 +220,7 @@ function NavIcon({ name }: { name: (typeof NAV)[number]['icon'] }) {
   if (name === 'company') return <Icon path="M4 16.5h12M6.5 16.5V5.5h7v11M8.2 8h1.2M10.6 8h1.2M8.2 10.5h1.2M10.6 10.5h1.2" />
   if (name === 'saving') return <Icon path="M6 15.5h8a3 3 0 0 0 0-6h-1.2a2.2 2.2 0 1 1 0-4.4H8" />
   if (name === 'plan') return <Icon path="M6 4.5h8v11H6v-11Zm2 3h4M8 10h4" />
+  if (name === 'todo') return <Icon path="M5 4.5h10v11H5v-11Zm2.2 5.2 1.6 1.6 3-3.2" />
   return <Icon path="M10 3.5v13M6 7.5h5.5a2.5 2.5 0 0 1 0 5H6" />
 }
 

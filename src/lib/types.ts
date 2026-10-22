@@ -101,6 +101,16 @@ export interface FixedExpense {
   active: boolean
 }
 
+export interface AdditionalExpense {
+  id: string
+  name: string
+  amount: number
+  dueDay: number
+  startDate: string
+  endDate: string
+  notes: string
+}
+
 export interface CreditCard {
   id: string
   nickname: string
@@ -207,21 +217,31 @@ export interface LeisurePlan {
   note: string
 }
 
+export interface HouseTask {
+  id: string
+  title: string
+  note: string
+  done: boolean
+}
+
 export interface AppState {
   version: 1
   incomes: IncomeSource[]
   companyEntries: CompanyEntry[]
   fixedExpenses: FixedExpense[]
+  additionalExpenses: AdditionalExpense[]
   cards: CreditCard[]
   purchases: Purchase[]
   cashExpenses: CashExpense[]
   paidFixed: Record<string, true>
+  paidAdditional: Record<string, true>
   paidInvoices: Record<string, true>
   goals: Goals
   groceryInflows: GroceryInflow[]
   customCategories: CustomCategory[]
   savings: SavingPot[]
   leisurePlans: LeisurePlan[]
+  tasks: HouseTask[]
 }
 
 export interface SpendEntry {
@@ -242,10 +262,12 @@ export function emptyState(): AppState {
     incomes: [],
     companyEntries: [],
     fixedExpenses: [],
+    additionalExpenses: [],
     cards: [],
     purchases: [],
     cashExpenses: [],
     paidFixed: {},
+    paidAdditional: {},
     paidInvoices: {},
     goals: {
       leisureWeeklyMax: null,
@@ -258,6 +280,7 @@ export function emptyState(): AppState {
     customCategories: [],
     savings: [],
     leisurePlans: [],
+    tasks: [],
   }
 }
 

@@ -1,5 +1,5 @@
 import { addMonthsClamped, parseDate, startOfWeek } from '../src/lib/dates.ts'
-import { billingMonthForDue, companyInMonth, fuelGoal, groceryGoal, installmentSchedule, invoiceDueDate, invoiceForCard, invoiceMonthFor, limitUsed, monthFlow, monthReport, overdueItems, spendEntries, spentInRange } from '../src/lib/finance.ts'
+import { additionalApplies, billingMonthForDue, companyInMonth, fuelGoal, groceryGoal, installmentSchedule, invoiceDueDate, invoiceForCard, invoiceMonthFor, limitUsed, monthFlow, monthReport, overdueItems, spendEntries, spentInRange } from '../src/lib/finance.ts'
 import { sanitize } from '../src/lib/storage.ts'
 import { emptyState, type AppState, type CreditCard, type Purchase } from '../src/lib/types.ts'
 
@@ -114,6 +114,19 @@ const school = {
 }
 assert(monthReport(school, '2026-10').fixedTotal === 0, 'fixo não entra antes da data inicial')
 assert(monthReport(school, '2026-11').fixedTotal === 800, 'fixo entra no mês da data inicial')
+
+const course = {
+  ...emptyState(),
+  additionalExpenses: [{ id: 'curso', name: 'Curso', amount: 200, dueDay: 10, startDate: '2026-10-01', endDate: '2026-12-10', notes: '' }],
+}
+assert(monthReport(course, '2026-09').additionalTotal === 0, 'adicional não entra antes de começar')
+assert(monthReport(course, '2026-10').additionalTotal === 200 && monthReport(course, '2026-12').additionalTotal === 200, 'adicional entra do mês inicial ao final')
+assert(monthReport(course, '2027-01').additionalTotal === 0, 'adicional sai depois da data final')
+assert(monthFlow(course, '2026-11').expense === 200, 'adicional sai da conta, sem cartão')
+const coursePaid = { ...course, paidAdditional: { 'curso:2026-11': true as const } }
+assert(monthReport(coursePaid, '2026-11').additionalOpen === 0 && monthReport(coursePaid, '2026-11').stillOpen === 0, 'marcar adicional como pago tira do em aberto')
+assert(monthReport(coursePaid, '2026-11').outflow === 200, 'adicional pago continua na saída do mês')
+assert(!additionalApplies(course.additionalExpenses[0], '2027-01'), 'depois do fim o adicional não vale mais')
 const schoolLate = overdueItems(school, parseDate('2026-12-20'))
 assert(!schoolLate.some((item) => item.month === '2026-10'), 'fixo não fica vencido antes de começar')
 assert(schoolLate.some((item) => item.month === '2026-11' && item.expenseId === 'escola'), 'fixo vencido conta a partir do mês inicial')

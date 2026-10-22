@@ -2,13 +2,14 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { pullHousehold, pushHousehold, subscribeHousehold } from './lib/cloud.ts'
 import { uid } from './lib/money.ts'
 import { dateOn, formatISO, monthKey, parseMonthKey } from './lib/dates.ts'
-import { fixedCardPurchaseId, fixedKey, fixedPaymentFromPurchase } from './lib/finance.ts'
+import { additionalKey, fixedCardPurchaseId, fixedKey, fixedPaymentFromPurchase } from './lib/finance.ts'
 import { loadState, sanitize, saveState } from './lib/storage.ts'
-import { emptyState, SPEND_CATEGORIES, type AppState, type CashExpense, type CompanyEntry, type CreditCard, type FixedExpense, type GroceryInflow, type IncomeSource, type LeisurePlan, type Purchase, type SavingPot, type SpendEntry } from './lib/types.ts'
+import { emptyState, SPEND_CATEGORIES, type AdditionalExpense, type AppState, type CashExpense, type CompanyEntry, type CreditCard, type FixedExpense, type GroceryInflow, type HouseTask, type IncomeSource, type LeisurePlan, type Purchase, type SavingPot, type SpendEntry } from './lib/types.ts'
 
 export type Page =
   | { id: 'dashboard' }
   | { id: 'fixed' }
+  | { id: 'additional' }
   | { id: 'cards' }
   | { id: 'card'; cardId: string; dueMonth?: string }
   | { id: 'grocery'; compose?: boolean }
@@ -19,6 +20,7 @@ export type Page =
   | { id: 'goals' }
   | { id: 'savings' }
   | { id: 'plans' }
+  | { id: 'todo' }
 
 interface Store {
   state: AppState
@@ -37,6 +39,9 @@ interface Store {
   removeFixed: (id: string) => void
   payFixed: (id: string, month: string, cardId: string | null) => void
   unpayFixed: (id: string, month: string) => void
+  upsertAdditional: (expense: AdditionalExpense) => void
+  removeAdditional: (id: string) => void
+  setAdditionalPaid: (id: string, month: string, paid: boolean) => void
   upsertCard: (card: CreditCard) => void
   removeCard: (id: string) => void
   toggleInvoicePaid: (cardId: string, year: number, monthIndex: number) => void
@@ -57,6 +62,9 @@ interface Store {
   removeSaving: (id: string) => void
   upsertPlan: (plan: LeisurePlan) => void
   removePlan: (id: string) => void
+  upsertTask: (task: HouseTask) => void
+  removeTask: (id: string) => void
+  setTaskDone: (id: string, done: boolean) => void
   replaceState: (input: unknown) => void
 }
 
@@ -255,6 +263,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           }
         })
       },
+      upsertAdditional: (expense) => {
+        setState((current) => {
+          const list = current.additionalExpenses ?? []
+          return {
+            ...current,
+            additionalExpenses: list.some((item) => item.id === expense.id)
+              ? list.map((item) => (item.id === expense.id ? expense : item))
+              : [...list, expense],
+          }
+        })
+        notify('Gasto adicional salvo')
+      },
+      removeAdditional: (id) => {
+        setState((current) => ({
+          ...current,
+          additionalExpenses: (current.additionalExpenses ?? []).filter((item) => item.id !== id),
+          paidAdditional: Object.fromEntries(Object.entries(current.paidAdditional ?? {}).filter(([key]) => !key.startsWith(`${id}:`))),
+        }))
+        notify('Gasto adicional removido')
+      },
+      setAdditionalPaid: (id, targetMonth, paid) => {
+        setState((current) => {
+          const paidAdditional = { ...(current.paidAdditional ?? {}) }
+          const key = additionalKey(id, targetMonth)
+          if (paid) paidAdditional[key] = true
+          else delete paidAdditional[key]
+          return { ...current, paidAdditional }
+        })
+      },
       upsertCard: (card) => {
         setState((current) => ({
           ...current,
@@ -418,6 +455,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       removePlan: (id) => {
         setState((current) => ({ ...current, leisurePlans: current.leisurePlans.filter((item) => item.id !== id) }))
         notify('Plano de lazer removido')
+      },
+      upsertTask: (task) => {
+        setState((current) => ({
+          ...current,
+          tasks: current.tasks.some((item) => item.id === task.id)
+            ? current.tasks.map((item) => (item.id === task.id ? task : item))
+            : [...current.tasks, task],
+        }))
+        notify('Tarefa salva')
+      },
+      removeTask: (id) => {
+        setState((current) => ({ ...current, tasks: current.tasks.filter((item) => item.id !== id) }))
+        notify('Tarefa removida')
+      },
+      setTaskDone: (id, done) => {
+        setState((current) => ({
+          ...current,
+          tasks: current.tasks.map((item) => (item.id === id ? { ...item, done } : item)),
+        }))
       },
       replaceState: (next: unknown) => {
         const clean = sanitize(next)

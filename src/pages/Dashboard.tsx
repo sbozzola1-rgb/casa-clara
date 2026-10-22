@@ -3,7 +3,7 @@ import { IncomeDialog } from '../components/dialogs.tsx'
 import { ExpenseMark } from '../components/ExpenseIcon.tsx'
 import { BudgetMeter, Button, FlowChart, Panel, ToneBadge, toneLabel } from '../components/ui.tsx'
 import { dateOn, dueTone, formatShort, monthRange, monthTitle, parseMonthKey, startOfWeek, weekTitle } from '../lib/dates.ts'
-import { fixedApplies, fixedCardPurchaseId, fixedKey, flowSeries, fuelGoal, groceryGoal, invoiceForCard, invoicesDueInMonth, limitUsed, monthFlow, openInvoiceMonth, overdueItems, spentInRange, variableSpending } from '../lib/finance.ts'
+import { additionalApplies, additionalKey, fixedApplies, fixedCardPurchaseId, fixedKey, flowSeries, fuelGoal, groceryGoal, invoiceForCard, invoicesDueInMonth, limitUsed, monthFlow, openInvoiceMonth, overdueItems, spentInRange, variableSpending } from '../lib/finance.ts'
 import { formatBRL, round2 } from '../lib/money.ts'
 import { useStore } from '../state.tsx'
 
@@ -33,10 +33,23 @@ export function Dashboard() {
   const fixedCounted = round2(report.fixedTotal - fixedOnCard)
   const outflowPieces = [
     { label: 'Fixos', value: fixedCounted },
+    { label: 'Adicionais', value: report.additionalTotal },
     { label: 'Cartões', value: report.invoiceTotal },
     { label: 'À vista', value: report.cashTotal },
     { label: 'Empresa, fora do cartão', value: flow.companyCash },
   ].filter((piece) => piece.value > 0)
+  const openPieces = [
+    { label: 'Fixos', value: report.fixedOpen },
+    { label: 'Adicionais', value: report.additionalOpen },
+    { label: 'Cartões', value: report.invoiceOpen },
+  ].filter((piece) => piece.value > 0)
+  const closeLine = leftover == null
+    ? `Neste mês sai ${formatBRL(flow.expense)}`
+    : leftover < 0
+      ? `O mês fecha negativo em ${formatBRL(Math.abs(leftover))}`
+      : leftover > 0
+        ? `Sobra ${formatBRL(leftover)} se pagar tudo`
+        : 'O mês fecha no zero'
   const late = overdueItems(state, today)
   const lateTotal = round2(late.reduce((sum, item) => sum + item.amount, 0))
   const series = flowSeries(state, month)
@@ -60,6 +73,20 @@ export function Dashboard() {
           amount: expense.amount,
           due,
           paid,
+        }
+      }),
+    ...(state.additionalExpenses ?? [])
+      .filter((expense) => additionalApplies(expense, month))
+      .map((expense) => {
+        const due = dateOn(year, monthIndex, expense.dueDay)
+        return {
+          id: expense.id,
+          title: expense.name,
+          detail: 'Gasto adicional',
+          icon: undefined as string | undefined,
+          amount: expense.amount,
+          due,
+          paid: Boolean(state.paidAdditional?.[additionalKey(expense.id, month)]),
         }
       }),
     ...invoicesDueInMonth(state, month).map((invoice) => {
@@ -95,7 +122,7 @@ export function Dashboard() {
         <div>
           <h1 className="font-serif text-4xl tracking-tight">{monthTitle(month)}</h1>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-soft">
-            A sobra olha o que sai da conta neste mês. Lazer e mercado olham a decisão de compra, no dia em que ela aconteceu.
+            Em destaque, o que ainda falta pagar. O fechamento do mês fica logo abaixo e olha tudo o que sai, pago ou não.
           </p>
         </div>
       </div>
@@ -104,14 +131,27 @@ export function Dashboard() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold tracking-[0.16em] text-white/60 uppercase">
-              {leftover == null ? 'Quanto sai neste mês' : leftover < 0 ? 'O mês fecha negativo' : 'Sobra se pagar tudo'}
+              {report.stillOpen > 0 ? 'Quanto ainda falta pagar' : 'Nada falta pagar'}
             </p>
             <p className="mt-2 font-serif text-5xl tracking-tight tabular-nums">
-              {formatBRL(leftover == null ? report.outflow : Math.abs(leftover))}
+              {formatBRL(report.stillOpen)}
+            </p>
+            {openPieces.length > 0 ? (
+              <ul className="mt-4 max-w-sm space-y-1.5">
+                {openPieces.map((piece) => (
+                  <li key={piece.label} className="flex items-baseline justify-between gap-6 text-sm text-white/80">
+                    <span>{piece.label}</span>
+                    <span className="font-medium tabular-nums text-white">{formatBRL(piece.value)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <p className="mt-3 text-sm text-white/75">
+              {flow.hasIncome ? `${closeLine} · entra ${formatBRL(flow.income)} · sai ${formatBRL(flow.expense)}` : closeLine}
             </p>
             {outflowPieces.length > 0 ? (
               <div className="mt-4 max-w-sm">
-                <p className="text-xs font-semibold tracking-[0.16em] text-white/50 uppercase">O que sai</p>
+                <p className="text-xs font-semibold tracking-[0.16em] text-white/50 uppercase">O que sai no mês</p>
                 <ul className="mt-2 space-y-1.5">
                   {outflowPieces.map((piece) => (
                     <li key={piece.label} className="flex items-baseline justify-between gap-6 text-sm text-white/80">
@@ -127,11 +167,6 @@ export function Dashboard() {
                 ) : null}
               </div>
             ) : null}
-            <p className="mt-3 text-sm text-white/75">
-              {flow.hasIncome
-                ? `Entra ${formatBRL(flow.income)} · sai ${formatBRL(flow.expense)} · em aberto ${formatBRL(report.stillOpen)}`
-                : 'Informe a renda da Sara e do Vinicius para ver se sobra alguma coisa.'}
-            </p>
             {state.incomes.length > 0 ? (
               <p className="mt-1 text-sm text-white/75">
                 Sara {formatBRL(flow.people.sara)} · Vinicius {formatBRL(flow.people.vinicius)}
@@ -153,7 +188,7 @@ export function Dashboard() {
       <Panel title="Entradas e saídas" className="mt-4">
         <FlowChart items={series.map((item) => ({ key: item.month, label: item.label, income: item.income, expense: item.expense }))} />
         <p className="mt-4 text-xs leading-relaxed text-ink-soft">
-          Entrada é a renda da Sara, do Vinicius e o que entrou na empresa. Saída é gasto fixo, fatura, Pix e o que saiu da empresa.
+          Entrada é a renda da Sara, do Vinicius e o que entrou na empresa. Saída é gasto fixo, gasto adicional, fatura, Pix e o que saiu da empresa.
         </p>
       </Panel>
 
