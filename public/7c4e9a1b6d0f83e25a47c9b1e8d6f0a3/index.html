@@ -155,6 +155,33 @@
   }
   .letter p { margin: 0 0 16px; }
   .name { font-style: italic; font-size: 26px; margin-top: 4px; }
+  .ask { margin-top: 10px; min-height: 130px; }
+  .question {
+    font-family: "Cormorant Garamond", Georgia, serif;
+    font-style: italic;
+    font-size: 34px;
+    margin: 0 0 14px;
+    color: #6e2433;
+  }
+  .choices { display: flex; gap: 12px; align-items: center; min-height: 54px; }
+  #yes, #no {
+    border: 0;
+    border-radius: 999px;
+    padding: 12px 26px;
+    font-family: Outfit, system-ui, sans-serif;
+    font-size: 18px;
+    cursor: pointer;
+  }
+  #yes { background: #6e2433; color: #fff8f4; }
+  #no { background: #efe8e2; color: #2b2422; }
+  #no.flee { position: fixed; z-index: 6; margin: 0; }
+  .yesmsg {
+    font-family: "Cormorant Garamond", Georgia, serif;
+    font-style: italic;
+    font-size: 26px;
+    color: #6e2433;
+    margin: 16px 0 0;
+  }
   .hidden { display: none; }
   @media (max-width: 720px) {
     .slot { width: 48vw; }
@@ -207,6 +234,14 @@
       <p>Quero focar ainda mais no que a gente tem daqui para frente. Prometo que vou me esforçar para que a nossa parceria seja mais forte e leve, e que você nunca tenha dúvidas do quanto é admirado e querido por mim. Preciso que você saiba, acima de qualquer briga ou erro meu, que meu plano é te fazer feliz todos os dias. Quero que você se sinta amado, sempre, sem espaço para inseguranças. Me perdoa pelo que fiz? Prometo que vou fazer valer a pena.</p>
       <p>Te amo.</p>
       <p class="name">com amor, sua baby qa</p>
+      <div class="ask">
+        <p class="question">Me perdoa?</p>
+        <div class="choices">
+          <button type="button" id="yes">Sim</button>
+          <button type="button" id="no">Não</button>
+        </div>
+        <p class="yesmsg hidden" id="yesmsg">Eu te amo. Obrigada por me perdoar.</p>
+      </div>
     </div>
   </main>
 <script>
@@ -225,6 +260,21 @@
     else song.play();
     playing = !playing;
     pauseBtn.textContent = playing ? "❚❚" : "▶";
+  };
+
+  const no = document.getElementById("no");
+  function flee(event) {
+    if (event) event.preventDefault();
+    const x = Math.random() * Math.max(8, window.innerWidth - no.offsetWidth - 12);
+    const y = Math.random() * Math.max(8, window.innerHeight - no.offsetHeight - 12);
+    no.classList.add("flee");
+    no.style.left = x + "px";
+    no.style.top = y + "px";
+  }
+  no.addEventListener("mouseenter", flee);
+  no.addEventListener("touchstart", flee, { passive: false });
+  document.getElementById("yes").onclick = () => {
+    document.getElementById("yesmsg").classList.remove("hidden");
   };
 </script>
 </body>
