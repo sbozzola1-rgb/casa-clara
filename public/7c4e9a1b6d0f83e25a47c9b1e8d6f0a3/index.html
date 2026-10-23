@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uma carta de Sara</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    font-family: Outfit, system-ui, sans-serif;
+    color: #2b2422;
+    background: #e7d3c6;
+  }
+  .scene {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    z-index: 0;
+    perspective: 1100px;
+    background:
+      radial-gradient(900px 500px at 50% 20%, #f6e6dc 0%, transparent 60%),
+      #e7d3c6;
+  }
+  .slot {
+    position: absolute;
+    width: 270px;
+    opacity: 0;
+    animation: emerge 1.35s cubic-bezier(.16,.84,.32,1) forwards;
+  }
+  .polaroid {
+    background: #fffdfb;
+    padding: 10px 10px 34px;
+    box-shadow: 0 16px 34px rgba(70, 36, 24, 0.22);
+    animation: sway 6.5s ease-in-out infinite;
+    animation-delay: var(--delay);
+    transform: rotate(var(--rot));
+  }
+  .polaroid img {
+    width: 100%;
+    height: 250px;
+    object-fit: cover;
+    display: block;
+    background: #ddd;
+  }
+  .polaroid figcaption {
+    font-family: Caveat, cursive;
+    text-align: center;
+    font-size: 22px;
+    color: #6d534c;
+    margin-top: 6px;
+  }
+  .p1 { top: -8%; left: -4%; width: 300px; --rot: -8deg; --delay: .05s; animation-delay: .02s; }
+  .p2 { top: -6%; left: 18%; width: 260px; --rot: 6deg; --delay: .15s; animation-delay: .12s; }
+  .p3 { top: -9%; left: 40%; width: 280px; --rot: -5deg; --delay: .25s; animation-delay: .22s; }
+  .p4 { top: -5%; right: -5%; width: 310px; --rot: 9deg; --delay: .35s; animation-delay: .32s; }
+  .p5 { top: 24%; left: -7%; width: 290px; --rot: 5deg; --delay: .45s; animation-delay: .4s; }
+  .p6 { top: 20%; left: 16%; width: 250px; --rot: -7deg; --delay: .55s; animation-delay: .5s; }
+  .p7 { top: 18%; right: 14%; width: 270px; --rot: 8deg; --delay: .65s; animation-delay: .58s; }
+  .p8 { top: 22%; right: -7%; width: 300px; --rot: -6deg; --delay: .75s; animation-delay: .66s; }
+  .p9 { bottom: -8%; left: -5%; width: 290px; --rot: 4deg; --delay: .85s; animation-delay: .74s; }
+  .p10 { bottom: -4%; left: 18%; width: 270px; --rot: -9deg; --delay: .95s; animation-delay: .82s; }
+  .p11 { bottom: -10%; left: 40%; width: 300px; --rot: 7deg; --delay: 1.05s; animation-delay: .9s; }
+  .p12 { bottom: -6%; right: 6%; width: 280px; --rot: -4deg; --delay: 1.15s; animation-delay: .98s; }
+  .p13 { top: 46%; left: 34%; width: 260px; --rot: 11deg; --delay: 1.25s; animation-delay: 1.06s; }
+  @keyframes emerge {
+    0% { opacity: 0; transform: translateY(90px) scale(0.15); filter: blur(10px); }
+    100% { opacity: 1; transform: none; filter: none; }
+  }
+  @keyframes sway {
+    0%, 100% { transform: rotate(var(--rot)) translateY(0); }
+    50% { transform: rotate(var(--rot)) translateY(-12px); }
+  }
+  .gate, .wrap { position: relative; z-index: 2; }
+  .gate {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+  }
+  .gate .card {
+    background: rgba(255, 251, 248, 0.92);
+    border-radius: 22px;
+    padding: 36px 32px;
+    text-align: center;
+    width: min(420px, 100%);
+  }
+  .gate h2 {
+    font-family: "Cormorant Garamond", Georgia, serif;
+    font-weight: 500;
+    font-size: 52px;
+    line-height: 0.95;
+    margin: 0 0 8px;
+    color: #4a342e;
+  }
+  .gate p { margin: 0 0 22px; font-weight: 300; color: #8a645c; font-size: 18px; }
+  .gate button, .pause { font-family: inherit; cursor: pointer; }
+  .gate button {
+    border: 0; background: #6e2433; color: #fff8f4;
+    border-radius: 999px; padding: 14px 22px; font-size: 16px;
+  }
+  .wrap {
+    width: min(480px, calc(100% - 28px));
+    margin: 28px auto 72px;
+    background: rgba(255, 252, 249, 0.96);
+    border-radius: 18px;
+    padding: 22px 22px 36px;
+    box-shadow: 0 20px 50px rgba(70, 36, 24, 0.12);
+  }
+  .kicker {
+    margin: 8px 0 0;
+    letter-spacing: 0.34em;
+    font-size: 11px;
+    font-weight: 500;
+    color: #b9b0aa;
+  }
+  h1 {
+    font-family: "Cormorant Garamond", Georgia, serif;
+    font-weight: 500;
+    font-size: 46px;
+    line-height: 1;
+    margin: 8px 0 18px;
+    color: #6f6763;
+  }
+  .player {
+    display: grid;
+    grid-template-columns: 1fr 54px;
+    gap: 12px;
+    align-items: center;
+    background: #6d6764;
+    color: white;
+    border-radius: 22px;
+    padding: 14px 14px 14px 18px;
+  }
+  .meta small {
+    display: block;
+    letter-spacing: 0.16em;
+    font-size: 10px;
+    opacity: 0.75;
+  }
+  .meta strong { display: block; font-size: 15px; font-weight: 500; margin-top: 4px; }
+  .meta span { display: block; font-size: 13px; font-weight: 300; opacity: 0.9; }
+  .pause {
+    width: 46px; height: 46px; border-radius: 50%;
+    border: 0; background: #f4f1ef; color: #2b2422; font-size: 16px;
+  }
+  .letter {
+    font-family: "Cormorant Garamond", Georgia, serif;
+    font-size: 22px;
+    line-height: 1.45;
+    margin-top: 28px;
+  }
+  .letter p { margin: 0 0 16px; }
+  .name { font-style: italic; font-size: 26px; margin-top: 4px; }
+  .hidden { display: none; }
+  @media (max-width: 720px) {
+    .slot { width: 48vw; }
+    .polaroid img { height: 180px; }
+    .polaroid figcaption { font-size: 18px; }
+    .p1, .p2, .p3, .p4, .p5, .p6, .p7, .p8, .p9, .p10, .p11, .p12, .p13 { width: 52vw; }
+    h1 { font-size: 38px; }
+  }
+</style>
+</head>
+<body>
+  <div class="scene" aria-hidden="true">
+    <div class="slot p1"><figure class="polaroid"><img src="fotos/1.jpg" alt=""><figcaption>você e eu</figcaption></figure></div>
+    <div class="slot p2"><figure class="polaroid"><img src="fotos/2.jpg" alt=""><figcaption>holambra</figcaption></figure></div>
+    <div class="slot p3"><figure class="polaroid"><img src="fotos/3.jpg" alt=""><figcaption>nosso dia</figcaption></figure></div>
+    <div class="slot p4"><figure class="polaroid"><img src="fotos/5.jpg" alt=""><figcaption>essa noite</figcaption></figure></div>
+    <div class="slot p5"><figure class="polaroid"><img src="fotos/4.jpg" alt=""><figcaption>só a gente</figcaption></figure></div>
+    <div class="slot p6"><figure class="polaroid"><img src="fotos/6.jpg" alt=""><figcaption>perto</figcaption></figure></div>
+    <div class="slot p7"><figure class="polaroid"><img src="fotos/7.jpg" alt=""><figcaption>praia</figcaption></figure></div>
+    <div class="slot p8"><figure class="polaroid"><img src="fotos/8.jpg" alt=""><figcaption>beijo</figcaption></figure></div>
+    <div class="slot p9"><figure class="polaroid"><img src="fotos/9.jpg" alt=""><figcaption>a gente</figcaption></figure></div>
+    <div class="slot p10"><figure class="polaroid"><img src="fotos/10.jpg" alt=""><figcaption>sol</figcaption></figure></div>
+    <div class="slot p11"><figure class="polaroid"><img src="fotos/11.jpg" alt=""><figcaption>noite</figcaption></figure></div>
+    <div class="slot p12"><figure class="polaroid"><img src="fotos/12.jpg" alt=""><figcaption>juntos</figcaption></figure></div>
+    <div class="slot p13"><figure class="polaroid"><img src="fotos/13.jpg" alt=""><figcaption>sempre</figcaption></figure></div>
+  </div>
+
+  <section class="gate" id="gate">
+    <div class="card">
+      <h2>Uma carta de Sara</h2>
+      <p>Prometo ser melhor</p>
+      <button id="open" type="button">Abrir e ouvir</button>
+    </div>
+  </section>
+
+  <main class="wrap hidden" id="letter">
+    <p class="kicker">UMA CARTA DE SARA</p>
+    <h1>Prometo ser melhor</h1>
+    <div class="player">
+      <div class="meta">
+        <small>TOCANDO AGORA</small>
+        <strong>Música: Eu Juro</strong>
+        <span>Leandro &amp; Leonardo</span>
+      </div>
+      <button class="pause" id="pause" type="button" aria-label="Pausar">❚❚</button>
+    </div>
+    <audio id="song" src="eu-juro.mp3" preload="auto"></audio>
+    <div class="letter">
+      <p>Andei pensando muito sobre o que aconteceu e a conclusão é uma só: eu falhei com a pessoa que mais amo. Não vou me justificar, porque não tem justificativa para te ver triste por minha causa. Sinto muito por ter te decepcionado, baby dev.</p>
+      <p>Quero focar ainda mais no que a gente tem daqui para frente. Prometo que vou me esforçar para que a nossa parceria seja mais forte e leve, e que você nunca tenha dúvidas do quanto é admirado e querido por mim. Preciso que você saiba, acima de qualquer briga ou erro meu, que meu plano é te fazer feliz todos os dias. Quero que você se sinta amado, sempre, sem espaço para inseguranças. Me perdoa pelo que fiz? Prometo que vou fazer valer a pena.</p>
+      <p>Te amo.</p>
+      <p class="name">com amor, sua baby qa</p>
+    </div>
+  </main>
+<script>
+  const song = document.getElementById("song");
+  const pauseBtn = document.getElementById("pause");
+  let playing = true;
+
+  document.getElementById("open").onclick = () => {
+    document.getElementById("gate").classList.add("hidden");
+    document.getElementById("letter").classList.remove("hidden");
+    song.play();
+  };
+
+  pauseBtn.onclick = () => {
+    if (playing) song.pause();
+    else song.play();
+    playing = !playing;
+    pauseBtn.textContent = playing ? "❚❚" : "▶";
+  };
+</script>
+</body>
+</html>
