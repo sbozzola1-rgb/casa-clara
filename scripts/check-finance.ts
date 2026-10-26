@@ -115,6 +115,16 @@ const school = {
 assert(monthReport(school, '2026-10').fixedTotal === 0, 'fixo não entra antes da data inicial')
 assert(monthReport(school, '2026-11').fixedTotal === 800, 'fixo entra no mês da data inicial')
 
+const fine = {
+  ...emptyState(),
+  fixedExpenses: [{ id: 'imposto', name: 'Imposto', amount: 100, dueDay: 10, startDate: null, category: 'Outro', icon: 'outro' as const, notes: '', active: true }],
+  paidFixed: { 'imposto:2026-10': true as const },
+  fixedSurcharges: { 'imposto:2026-10': 15 },
+}
+assert(monthReport(fine, '2026-10').fixedTotal === 115 && monthReport(fine, '2026-10').fixedPaid === 115, 'juros e multa entram no mês em que foram pagos')
+assert(monthReport(fine, '2026-11').fixedTotal === 100 && monthReport(fine, '2026-11').fixedOpen === 100, 'o mês seguinte volta ao valor fixo')
+assert(monthFlow(fine, '2026-10').expense === 115, 'juros e multa saem da conta só naquele mês')
+
 const course = {
   ...emptyState(),
   additionalExpenses: [{ id: 'curso', name: 'Curso', amount: 200, dueDay: 10, startDate: '2026-10-01', endDate: '2026-12-10', notes: '' }],

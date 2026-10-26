@@ -1,4 +1,4 @@
-import { emptyState, CARD_COLORS, COMPANY_CATEGORIES, COMPANY_PAYMENTS, FIXED_ICONS, iconForCategory, PAYMENT_METHODS, PEOPLE, SPEND_CATEGORIES, type AppState, type CardColorId, type CompanyDirection, type CompanyPayment, type CustomCategory, type FixedIconId, type AdditionalExpense, type GroceryInflow, type HouseTask, type IncomeSource, type LeisurePlan, type PaymentMethod, type Person, type SavingPot } from './types.ts'
+import { emptyState, CARD_COLORS, COMPANY_CATEGORIES, COMPANY_PAYMENTS, FIXED_ICONS, iconForCategory, PAYMENT_METHODS, PEOPLE, SPEND_CATEGORIES, type AppState, type CardColorId, type CompanyDirection, type CompanyPayment, type CustomCategory, type FixedIconId, type AdditionalExpense, type GroceryInflow, type HouseTask, type IncomeSource, type LeisurePlan, type PaymentMethod, type Person, type SavingPot, type TaskAssignee, type TaskTag } from './types.ts'
 
 const KEY = 'casa-clara.v1'
 const spendIds = new Set<string>(SPEND_CATEGORIES.map((item) => item.id))
@@ -87,6 +87,17 @@ function readCustomCategories(value: unknown): CustomCategory[] {
   return items
 }
 
+function readFixedSurcharges(value: unknown): Record<string, number> {
+  const amounts: Record<string, number> = {}
+  if (!value || typeof value !== 'object') return amounts
+  for (const [key, amountValue] of Object.entries(value)) {
+    if (!/^[^:]+:\d{4}-\d{2}$/.test(key)) continue
+    const amount = numberOrNull(amountValue)
+    if (amount != null && amount > 0) amounts[key] = amount
+  }
+  return amounts
+}
+
 function readMonthAmounts(value: unknown): Record<string, number> {
   const amounts: Record<string, number> = {}
   if (!value || typeof value !== 'object') return amounts
@@ -108,6 +119,7 @@ export function sanitize(input: unknown): AppState | null {
   const customCategories = readCustomCategories(source.customCategories)
   const customIds = new Set(customCategories.map((item) => item.id))
   const groceryInflows = readGroceryInflows(source.groceryInflows)
+  const taskTags = readTaskTags(source.taskTags)
 
   return {
     version: 1,
@@ -207,6 +219,7 @@ export function sanitize(input: unknown): AppState | null {
       : [],
     groceryInflows,
     paidFixed: flagMap(source.paidFixed),
+    fixedSurcharges: readFixedSurcharges(source.fixedSurcharges),
     paidAdditional: flagMap(source.paidAdditional),
     paidInvoices: flagMap(source.paidInvoices),
     goals: {
@@ -219,7 +232,8 @@ export function sanitize(input: unknown): AppState | null {
     customCategories,
     savings: readSavings(source.savings),
     leisurePlans: readLeisurePlans(source.leisurePlans),
-    tasks: readTasks(source.tasks),
+    taskTags,
+    tasks: readTasks(source.tasks, taskTags),
   }
 }
 
@@ -268,13 +282,43 @@ function readLeisurePlans(value: unknown): LeisurePlan[] {
   })
 }
 
-function readTasks(value: unknown): HouseTask[] {
+function readTaskTags(value: unknown): TaskTag[] {
   if (!Array.isArray(value)) return []
+  const seen = new Set<string>()
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object' || typeof item.id !== 'string') return []
+    const name = text(item.name).trim()
+    const key = name.toLowerCase()
+    if (!name || seen.has(key)) return []
+    seen.add(key)
+    return [{ id: item.id, name }]
+  })
+}
+
+function readTasks(value: unknown, tags: TaskTag[]): HouseTask[] {
+  if (!Array.isArray(value)) return []
+  const tagIds = new Set(tags.map((tag) => tag.id))
+  const assignees = new Set<TaskAssignee>(['sara', 'vinicius', 'ambos'])
   return value.flatMap((item) => {
     if (!item || typeof item !== 'object' || typeof item.id !== 'string') return []
     const title = text(item.title).trim()
     if (!title) return []
-    return [{ id: item.id, title, note: text(item.note).trim(), done: item.done === true }]
+    const due = text(item.dueDate)
+    const assignee = text(item.assignee)
+    const rawTags = Array.isArray(item.tagIds) ? item.tagIds : []
+    const kept: string[] = []
+    for (const id of rawTags) {
+      if (typeof id === 'string' && tagIds.has(id) && !kept.includes(id)) kept.push(id)
+    }
+    return [{
+      id: item.id,
+      title,
+      note: text(item.note).trim(),
+      done: item.done === true,
+      dueDate: /^\d{4}-\d{2}-\d{2}$/.test(due) ? due : null,
+      assignee: assignees.has(assignee as TaskAssignee) ? (assignee as TaskAssignee) : null,
+      tagIds: kept,
+    }]
   })
 }
 

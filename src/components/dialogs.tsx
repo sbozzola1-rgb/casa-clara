@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { formatShort, monthTitle, parseDate, parseDay, todayISO } from '../lib/dates.ts'
 import { ExpenseIcon } from './ExpenseIcon.tsx'
 import { groceryInflowApplies, installmentSchedule } from '../lib/finance.ts'
-import { formatBRL, formatInput, parseMoney, uid } from '../lib/money.ts'
+import { formatBRL, formatInput, parseMoney, round2, uid } from '../lib/money.ts'
 import {
   CARD_COLORS,
   COMPANY_CATEGORIES,
@@ -251,21 +251,28 @@ export function FixedDialog({ expense, onClose }: { expense: FixedExpense | null
 export function PayFixedDialog({ expense, month, onClose }: { expense: FixedExpense; month: string; onClose: () => void }) {
   const { state, payFixed } = useStore()
   const [cardId, setCardId] = useState('')
+  const [surcharge, setSurcharge] = useState('')
   const [error, setError] = useState('')
+  const extra = parseMoney(surcharge) ?? 0
+  const total = round2(expense.amount + extra)
 
-  const payOnCard = () => {
-    if (!cardId) {
+  const pay = (onCard: boolean) => {
+    if (onCard && !cardId) {
       setError('Escolha o cartão.')
       return
     }
-    payFixed(expense.id, month, cardId)
+    if (surcharge.trim() && parseMoney(surcharge) == null) {
+      setError('O valor de juros e multa não fechou.')
+      return
+    }
+    payFixed(expense.id, month, onCard ? cardId : null, extra)
     onClose()
   }
 
   return (
     <Modal
       title={`Pagar ${expense.name}`}
-      description={`${monthTitle(month)} · ${formatBRL(expense.amount)}`}
+      description={`${monthTitle(month)} · principal ${formatBRL(expense.amount)}`}
       onClose={onClose}
       footer={
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -273,16 +280,10 @@ export function PayFixedDialog({ expense, month, onClose }: { expense: FixedExpe
             Cancelar
           </Button>
           <div className="flex flex-wrap gap-3">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                payFixed(expense.id, month, null)
-                onClose()
-              }}
-            >
+            <Button variant="ghost" onClick={() => pay(false)}>
               Saiu da conta
             </Button>
-            <Button onClick={payOnCard} disabled={state.cards.length === 0}>
+            <Button onClick={() => pay(true)} disabled={state.cards.length === 0}>
               Lançar no cartão
             </Button>
           </div>
@@ -293,9 +294,18 @@ export function PayFixedDialog({ expense, month, onClose }: { expense: FixedExpe
         className="space-y-4 pb-2"
         onSubmit={(event) => {
           event.preventDefault()
-          payOnCard()
+          pay(true)
         }}
       >
+        <MoneyField
+          label="Juros e multa"
+          value={surcharge}
+          onChange={setSurcharge}
+          hint="Só neste mês. O valor fixo dos outros meses continua o principal."
+        />
+        <p className="text-sm text-ink">
+          Neste mês sai <span className="font-medium tabular-nums">{formatBRL(total)}</span>
+        </p>
         <Field label="Cartão" hint="O valor entra na fatura desse cartão e deixa de sair de novo da conta neste mês.">
           <select className={fieldClass} value={cardId} onChange={(event) => setCardId(event.target.value)}>
             <option value="">Escolha o cartão</option>

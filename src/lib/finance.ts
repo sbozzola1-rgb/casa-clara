@@ -397,6 +397,15 @@ export function additionalApplies(expense: { startDate: string; endDate: string 
   return target >= start && target <= end
 }
 
+export function fixedSurcharge(state: AppState, expenseId: string, month: string): number {
+  const amount = state.fixedSurcharges?.[fixedKey(expenseId, month)] ?? 0
+  return amount > 0 ? round2(amount) : 0
+}
+
+export function fixedMonthAmount(expense: { id: string; amount: number }, state: AppState, month: string): number {
+  return round2(expense.amount + fixedSurcharge(state, expense.id, month))
+}
+
 export function fixedApplies(expense: { active: boolean; startDate?: string | null }, month: string): boolean {
   if (!expense.active) return false
   if (!expense.startDate || !/^\d{4}-\d{2}-\d{2}$/.test(expense.startDate)) return true
@@ -471,9 +480,10 @@ export function attentionCount(state: AppState, today: Date): number {
 
 export function monthReport(state: AppState, month: string): MonthReport {
   const active = state.fixedExpenses.filter((expense) => fixedApplies(expense, month))
-  const fixedTotal = round2(active.reduce((sum, expense) => sum + expense.amount, 0))
+  const amountOf = (expense: { id: string; amount: number }) => fixedMonthAmount(expense, state, month)
+  const fixedTotal = round2(active.reduce((sum, expense) => sum + amountOf(expense), 0))
   const fixedPaid = round2(
-    active.reduce((sum, expense) => sum + (state.paidFixed[fixedKey(expense.id, month)] ? expense.amount : 0), 0),
+    active.reduce((sum, expense) => sum + (state.paidFixed[fixedKey(expense.id, month)] ? amountOf(expense) : 0), 0),
   )
   const invoices = invoicesDueInMonth(state, month)
   const invoiceTotal = round2(invoices.reduce((sum, invoice) => sum + invoice.total, 0))
@@ -486,7 +496,7 @@ export function monthReport(state: AppState, month: string): MonthReport {
   )
   const onCard = round2(
     active.reduce(
-      (sum, expense) => sum + (state.purchases.some((item) => item.id === fixedCardPurchaseId(expense.id, month)) ? expense.amount : 0),
+      (sum, expense) => sum + (state.purchases.some((item) => item.id === fixedCardPurchaseId(expense.id, month)) ? amountOf(expense) : 0),
       0,
     ),
   )

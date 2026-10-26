@@ -3,7 +3,7 @@ import { IncomeDialog } from '../components/dialogs.tsx'
 import { ExpenseMark } from '../components/ExpenseIcon.tsx'
 import { BudgetMeter, Button, FlowChart, Panel, ToneBadge, toneLabel } from '../components/ui.tsx'
 import { dateOn, dueTone, formatShort, monthRange, monthTitle, parseMonthKey, startOfWeek, weekTitle } from '../lib/dates.ts'
-import { additionalApplies, additionalKey, fixedApplies, fixedCardPurchaseId, fixedKey, flowSeries, fuelGoal, groceryGoal, invoiceForCard, invoicesDueInMonth, limitUsed, monthFlow, openInvoiceMonth, overdueItems, spentInRange, variableSpending } from '../lib/finance.ts'
+import { additionalApplies, additionalKey, fixedApplies, fixedCardPurchaseId, fixedKey, fixedMonthAmount, flowSeries, fuelGoal, groceryGoal, invoiceForCard, invoicesDueInMonth, limitUsed, monthFlow, openInvoiceMonth, overdueItems, spentInRange, variableSpending } from '../lib/finance.ts'
 import { formatBRL, round2 } from '../lib/money.ts'
 import { useStore } from '../state.tsx'
 
@@ -28,7 +28,7 @@ export function Dashboard() {
   const fixedOnCard = round2(
     state.fixedExpenses
       .filter((expense) => fixedApplies(expense, month))
-      .reduce((sum, expense) => sum + (state.purchases.some((item) => item.id === fixedCardPurchaseId(expense.id, month)) ? expense.amount : 0), 0),
+      .reduce((sum, expense) => sum + (state.purchases.some((item) => item.id === fixedCardPurchaseId(expense.id, month)) ? fixedMonthAmount(expense, state, month) : 0), 0),
   )
   const fixedCounted = round2(report.fixedTotal - fixedOnCard)
   const outflowPieces = [
@@ -70,7 +70,7 @@ export function Dashboard() {
           title: expense.name,
           detail: cardName ? `${expense.category} · ${cardName}` : expense.category,
           icon: expense.icon,
-          amount: expense.amount,
+          amount: fixedMonthAmount(expense, state, month),
           due,
           paid,
         }

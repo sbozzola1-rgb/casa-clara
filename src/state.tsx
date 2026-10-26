@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { pullHousehold, pushHousehold, subscribeHousehold } from './lib/cloud.ts'
-import { uid } from './lib/money.ts'
+import { round2, uid } from './lib/money.ts'
 import { dateOn, formatISO, monthKey, parseMonthKey } from './lib/dates.ts'
 import { additionalKey, fixedCardPurchaseId, fixedKey, fixedPaymentFromPurchase } from './lib/finance.ts'
 import { loadState, sanitize, saveState } from './lib/storage.ts'
@@ -37,7 +37,7 @@ interface Store {
   removeCompany: (id: string) => void
   upsertFixed: (expense: FixedExpense) => void
   removeFixed: (id: string) => void
-  payFixed: (id: string, month: string, cardId: string | null) => void
+  payFixed: (id: string, month: string, cardId: string | null, surcharge?: number) => void
   unpayFixed: (id: string, month: string) => void
   upsertAdditional: (expense: AdditionalExpense) => void
   removeAdditional: (id: string) => void
@@ -65,6 +65,8 @@ interface Store {
   upsertTask: (task: HouseTask) => void
   removeTask: (id: string) => void
   setTaskDone: (id: string, done: boolean) => void
+  addTaskTag: (name: string) => string
+  removeTaskTag: (id: string) => void
   replaceState: (input: unknown) => void
 }
 
@@ -212,10 +214,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             const payment = fixedPaymentFromPurchase(item.id)
             if (!payment || payment.expenseId !== expense.id) return item
             const { year, monthIndex } = parseMonthKey(payment.month)
+            const extra = current.fixedSurcharges?.[fixedKey(expense.id, payment.month)] ?? 0
             return {
               ...item,
               description: expense.name,
-              amount: expense.amount,
+              amount: round2(expense.amount + (extra > 0 ? extra : 0)),
               date: formatISO(dateOn(year, monthIndex, expense.dueDay)),
             }
           }),
@@ -227,38 +230,48 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ...current,
           fixedExpenses: current.fixedExpenses.filter((item) => item.id !== id),
           paidFixed: Object.fromEntries(Object.entries(current.paidFixed).filter(([key]) => !key.startsWith(`${id}:`))),
+          fixedSurcharges: Object.fromEntries(Object.entries(current.fixedSurcharges ?? {}).filter(([key]) => !key.startsWith(`${id}:`))),
           purchases: current.purchases.filter((item) => fixedPaymentFromPurchase(item.id)?.expenseId !== id),
         }))
         notify('Gasto fixo removido')
       },
-      payFixed: (id, targetMonth, cardId) => {
+      payFixed: (id, targetMonth, cardId, surcharge = 0) => {
         setState((current) => {
           const expense = current.fixedExpenses.find((item) => item.id === id)
           if (!expense) return current
+          const extra = round2(Math.max(0, surcharge || 0))
+          const key = fixedKey(id, targetMonth)
+          const fixedSurcharges = { ...(current.fixedSurcharges ?? {}) }
+          if (extra > 0) fixedSurcharges[key] = extra
+          else delete fixedSurcharges[key]
           const purchaseId = fixedCardPurchaseId(id, targetMonth)
-          const paidFixed = { ...current.paidFixed, [fixedKey(id, targetMonth)]: true as const }
+          const paidFixed = { ...current.paidFixed, [key]: true as const }
           const without = current.purchases.filter((item) => item.id !== purchaseId)
-          if (!cardId) return { ...current, paidFixed, purchases: without }
+          if (!cardId) return { ...current, paidFixed, fixedSurcharges, purchases: without }
           const { year, monthIndex } = parseMonthKey(targetMonth)
           const purchase: Purchase = {
             id: purchaseId,
             cardId,
             description: expense.name,
-            amount: expense.amount,
+            amount: round2(expense.amount + extra),
             installments: 1,
             date: formatISO(dateOn(year, monthIndex, expense.dueDay)),
             category: 'outro',
           }
-          return { ...current, paidFixed, purchases: [...without, purchase] }
+          return { ...current, paidFixed, fixedSurcharges, purchases: [...without, purchase] }
         })
       },
       unpayFixed: (id, targetMonth) => {
         setState((current) => {
+          const key = fixedKey(id, targetMonth)
           const paidFixed = { ...current.paidFixed }
-          delete paidFixed[fixedKey(id, targetMonth)]
+          delete paidFixed[key]
+          const fixedSurcharges = { ...(current.fixedSurcharges ?? {}) }
+          delete fixedSurcharges[key]
           return {
             ...current,
             paidFixed,
+            fixedSurcharges,
             purchases: current.purchases.filter((item) => item.id !== fixedCardPurchaseId(id, targetMonth)),
           }
         })
@@ -473,6 +486,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setState((current) => ({
           ...current,
           tasks: current.tasks.map((item) => (item.id === id ? { ...item, done } : item)),
+        }))
+      },
+      addTaskTag: (name) => {
+        const trimmed = name.trim()
+        if (!trimmed) return ''
+        let id = ''
+        let created = false
+        setState((current) => {
+          const existing = (current.taskTags ?? []).find((tag) => tag.name.toLowerCase() === trimmed.toLowerCase())
+          if (existing) {
+            id = existing.id
+            return current
+          }
+          id = uid()
+          created = true
+          return { ...current, taskTags: [...(current.taskTags ?? []), { id, name: trimmed }] }
+        })
+        if (created) notify('Tag criada')
+        return id
+      },
+      removeTaskTag: (id) => {
+        setState((current) => ({
+          ...current,
+          taskTags: (current.taskTags ?? []).filter((tag) => tag.id !== id),
+          tasks: current.tasks.map((task) => ({ ...task, tagIds: (task.tagIds ?? []).filter((tagId) => tagId !== id) })),
         }))
       },
       replaceState: (next: unknown) => {

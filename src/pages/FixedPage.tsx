@@ -3,13 +3,13 @@ import { FixedDialog, PayFixedDialog } from '../components/dialogs.tsx'
 import { ExpenseMark } from '../components/ExpenseIcon.tsx'
 import { Button, EmptyState, PageIntro, ToneBadge, toneLabel } from '../components/ui.tsx'
 import { dateOn, dueTone, formatShort, parseDate, parseMonthKey } from '../lib/dates.ts'
-import { fixedApplies, fixedCardPurchaseId, fixedKey, monthReport } from '../lib/finance.ts'
+import { fixedApplies, fixedCardPurchaseId, fixedKey, fixedMonthAmount, fixedSurcharge, monthReport } from '../lib/finance.ts'
 import { formatBRL } from '../lib/money.ts'
 import type { FixedExpense } from '../lib/types.ts'
 import { useStore } from '../state.tsx'
 
 export function FixedPage() {
-  const { state, month, today, payFixed, unpayFixed } = useStore()
+  const { state, month, today, unpayFixed } = useStore()
   const [editing, setEditing] = useState<FixedExpense | null | 'new'>(null)
   const [paying, setPaying] = useState<FixedExpense | null>(null)
   const { year, monthIndex } = parseMonthKey(month)
@@ -57,7 +57,6 @@ export function FixedPage() {
                     aria-label={`Marcar ${expense.name} como pago`}
                     onChange={() => {
                       if (paid) unpayFixed(expense.id, month)
-                      else if (state.cards.length === 0) payFixed(expense.id, month, null)
                       else setPaying(expense)
                     }}
                   />
@@ -72,10 +71,11 @@ export function FixedPage() {
                     Vence {formatShort(due)} · {expense.category}
                     {expense.startDate ? ` · desde ${formatShort(parseDate(expense.startDate))}` : ''}
                     {cardName ? ` · no ${cardName}` : ''}
+                    {fixedSurcharge(state, expense.id, month) > 0 ? ` · juros e multa ${formatBRL(fixedSurcharge(state, expense.id, month))}` : ''}
                     {expense.notes ? ` · ${expense.notes}` : ''}
                   </span>
                 </button>
-                <span className="font-medium tabular-nums">{formatBRL(expense.amount)}</span>
+                <span className="font-medium tabular-nums">{formatBRL(fixedMonthAmount(expense, state, month))}</span>
               </li>
             )
           })}

@@ -217,11 +217,27 @@ export interface LeisurePlan {
   note: string
 }
 
+export const TASK_ASSIGNEES = [
+  { id: 'sara', label: 'Sara' },
+  { id: 'vinicius', label: 'Vinicius' },
+  { id: 'ambos', label: 'Os dois' },
+] as const
+
+export type TaskAssignee = (typeof TASK_ASSIGNEES)[number]['id']
+
+export interface TaskTag {
+  id: string
+  name: string
+}
+
 export interface HouseTask {
   id: string
   title: string
   note: string
   done: boolean
+  dueDate: string | null
+  assignee: TaskAssignee | null
+  tagIds: string[]
 }
 
 export interface AppState {
@@ -234,6 +250,7 @@ export interface AppState {
   purchases: Purchase[]
   cashExpenses: CashExpense[]
   paidFixed: Record<string, true>
+  fixedSurcharges: Record<string, number>
   paidAdditional: Record<string, true>
   paidInvoices: Record<string, true>
   goals: Goals
@@ -242,6 +259,7 @@ export interface AppState {
   savings: SavingPot[]
   leisurePlans: LeisurePlan[]
   tasks: HouseTask[]
+  taskTags: TaskTag[]
 }
 
 export interface SpendEntry {
@@ -267,6 +285,7 @@ export function emptyState(): AppState {
     purchases: [],
     cashExpenses: [],
     paidFixed: {},
+    fixedSurcharges: {},
     paidAdditional: {},
     paidInvoices: {},
     goals: {
@@ -281,6 +300,7 @@ export function emptyState(): AppState {
     savings: [],
     leisurePlans: [],
     tasks: [],
+    taskTags: [],
   }
 }
 
