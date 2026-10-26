@@ -251,6 +251,8 @@ export interface AppState {
   cashExpenses: CashExpense[]
   paidFixed: Record<string, true>
   fixedSurcharges: Record<string, number>
+  additionalSurcharges: Record<string, number>
+  invoiceSurcharges: Record<string, number>
   paidAdditional: Record<string, true>
   paidInvoices: Record<string, true>
   goals: Goals
@@ -286,6 +288,8 @@ export function emptyState(): AppState {
     cashExpenses: [],
     paidFixed: {},
     fixedSurcharges: {},
+    additionalSurcharges: {},
+    invoiceSurcharges: {},
     paidAdditional: {},
     paidInvoices: {},
     goals: {

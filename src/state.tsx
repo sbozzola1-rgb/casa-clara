@@ -41,10 +41,10 @@ interface Store {
   unpayFixed: (id: string, month: string) => void
   upsertAdditional: (expense: AdditionalExpense) => void
   removeAdditional: (id: string) => void
-  setAdditionalPaid: (id: string, month: string, paid: boolean) => void
+  setAdditionalPaid: (id: string, month: string, paid: boolean, surcharge?: number) => void
   upsertCard: (card: CreditCard) => void
   removeCard: (id: string) => void
-  toggleInvoicePaid: (cardId: string, year: number, monthIndex: number) => void
+  toggleInvoicePaid: (cardId: string, year: number, monthIndex: number, surcharge?: number) => void
   upsertPurchase: (purchase: Purchase) => void
   removePurchase: (id: string) => void
   saveSpend: (previous: SpendEntry | null, next: { kind: 'card'; purchase: Purchase } | { kind: 'cash'; expense: CashExpense }) => void
@@ -293,16 +293,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ...current,
           additionalExpenses: (current.additionalExpenses ?? []).filter((item) => item.id !== id),
           paidAdditional: Object.fromEntries(Object.entries(current.paidAdditional ?? {}).filter(([key]) => !key.startsWith(`${id}:`))),
+          additionalSurcharges: Object.fromEntries(Object.entries(current.additionalSurcharges ?? {}).filter(([key]) => !key.startsWith(`${id}:`))),
         }))
         notify('Gasto adicional removido')
       },
-      setAdditionalPaid: (id, targetMonth, paid) => {
+      setAdditionalPaid: (id, targetMonth, paid, surcharge = 0) => {
         setState((current) => {
           const paidAdditional = { ...(current.paidAdditional ?? {}) }
+          const additionalSurcharges = { ...(current.additionalSurcharges ?? {}) }
           const key = additionalKey(id, targetMonth)
-          if (paid) paidAdditional[key] = true
-          else delete paidAdditional[key]
-          return { ...current, paidAdditional }
+          const extra = round2(Math.max(0, surcharge || 0))
+          if (paid) {
+            paidAdditional[key] = true
+            if (extra > 0) additionalSurcharges[key] = extra
+            else delete additionalSurcharges[key]
+          } else {
+            delete paidAdditional[key]
+            delete additionalSurcharges[key]
+          }
+          return { ...current, paidAdditional, additionalSurcharges }
         })
       },
       upsertCard: (card) => {
@@ -323,13 +332,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }))
         notify('Cartão removido')
       },
-      toggleInvoicePaid: (cardId, year, monthIndex) => {
+      toggleInvoicePaid: (cardId, year, monthIndex, surcharge = 0) => {
         const key = `${cardId}:${year}-${String(monthIndex + 1).padStart(2, '0')}`
+        const extra = round2(Math.max(0, surcharge || 0))
         setState((current) => {
           const paidInvoices = { ...current.paidInvoices }
-          if (paidInvoices[key]) delete paidInvoices[key]
-          else paidInvoices[key] = true
-          return { ...current, paidInvoices }
+          const invoiceSurcharges = { ...(current.invoiceSurcharges ?? {}) }
+          if (paidInvoices[key]) {
+            delete paidInvoices[key]
+            delete invoiceSurcharges[key]
+          } else {
+            paidInvoices[key] = true
+            if (extra > 0) invoiceSurcharges[key] = extra
+            else delete invoiceSurcharges[key]
+          }
+          return { ...current, paidInvoices, invoiceSurcharges }
         })
       },
       upsertPurchase: (purchase) => {

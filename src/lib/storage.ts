@@ -220,6 +220,8 @@ export function sanitize(input: unknown): AppState | null {
     groceryInflows,
     paidFixed: flagMap(source.paidFixed),
     fixedSurcharges: readFixedSurcharges(source.fixedSurcharges),
+    additionalSurcharges: readFixedSurcharges(source.additionalSurcharges),
+    invoiceSurcharges: readFixedSurcharges(source.invoiceSurcharges),
     paidAdditional: flagMap(source.paidAdditional),
     paidInvoices: flagMap(source.paidInvoices),
     goals: {

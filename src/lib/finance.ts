@@ -397,9 +397,29 @@ export function additionalApplies(expense: { startDate: string; endDate: string 
   return target >= start && target <= end
 }
 
-export function fixedSurcharge(state: AppState, expenseId: string, month: string): number {
-  const amount = state.fixedSurcharges?.[fixedKey(expenseId, month)] ?? 0
+function storedSurcharge(map: Record<string, number> | undefined, key: string): number {
+  const amount = map?.[key] ?? 0
   return amount > 0 ? round2(amount) : 0
+}
+
+export function fixedSurcharge(state: AppState, expenseId: string, month: string): number {
+  return storedSurcharge(state.fixedSurcharges, fixedKey(expenseId, month))
+}
+
+export function additionalSurcharge(state: AppState, expenseId: string, month: string): number {
+  return storedSurcharge(state.additionalSurcharges, additionalKey(expenseId, month))
+}
+
+export function additionalMonthAmount(expense: { id: string; amount: number }, state: AppState, month: string): number {
+  return round2(expense.amount + additionalSurcharge(state, expense.id, month))
+}
+
+export function invoiceSurcharge(state: AppState, cardId: string, year: number, monthIndex: number): number {
+  return storedSurcharge(state.invoiceSurcharges, invoiceKey(cardId, year, monthIndex))
+}
+
+export function invoiceMonthAmount(invoice: { cardId: string; year: number; monthIndex: number; total: number }, state: AppState): number {
+  return round2(invoice.total + invoiceSurcharge(state, invoice.cardId, invoice.year, invoice.monthIndex))
 }
 
 export function fixedMonthAmount(expense: { id: string; amount: number }, state: AppState, month: string): number {
@@ -486,8 +506,8 @@ export function monthReport(state: AppState, month: string): MonthReport {
     active.reduce((sum, expense) => sum + (state.paidFixed[fixedKey(expense.id, month)] ? amountOf(expense) : 0), 0),
   )
   const invoices = invoicesDueInMonth(state, month)
-  const invoiceTotal = round2(invoices.reduce((sum, invoice) => sum + invoice.total, 0))
-  const invoicePaid = round2(invoices.reduce((sum, invoice) => sum + (invoice.paid ? invoice.total : 0), 0))
+  const invoiceTotal = round2(invoices.reduce((sum, invoice) => sum + invoiceMonthAmount(invoice, state), 0))
+  const invoicePaid = round2(invoices.reduce((sum, invoice) => sum + (invoice.paid ? invoiceMonthAmount(invoice, state) : 0), 0))
   const { start, end } = monthRange(month)
   const cashTotal = round2(
     state.cashExpenses
@@ -501,9 +521,10 @@ export function monthReport(state: AppState, month: string): MonthReport {
     ),
   )
   const extras = (state.additionalExpenses ?? []).filter((expense) => additionalApplies(expense, month))
-  const additionalTotal = round2(extras.reduce((sum, expense) => sum + expense.amount, 0))
+  const extraAmount = (expense: { id: string; amount: number }) => additionalMonthAmount(expense, state, month)
+  const additionalTotal = round2(extras.reduce((sum, expense) => sum + extraAmount(expense), 0))
   const additionalPaid = round2(
-    extras.reduce((sum, expense) => sum + (state.paidAdditional?.[additionalKey(expense.id, month)] ? expense.amount : 0), 0),
+    extras.reduce((sum, expense) => sum + (state.paidAdditional?.[additionalKey(expense.id, month)] ? extraAmount(expense) : 0), 0),
   )
   const outflow = round2(fixedTotal - onCard + additionalTotal + invoiceTotal + cashTotal)
   return {

@@ -136,6 +136,10 @@ assert(monthFlow(course, '2026-11').expense === 200, 'adicional sai da conta, se
 const coursePaid = { ...course, paidAdditional: { 'curso:2026-11': true as const } }
 assert(monthReport(coursePaid, '2026-11').additionalOpen === 0 && monthReport(coursePaid, '2026-11').stillOpen === 0, 'marcar adicional como pago tira do em aberto')
 assert(monthReport(coursePaid, '2026-11').outflow === 200, 'adicional pago continua na saída do mês')
+const courseFine = { ...coursePaid, additionalSurcharges: { 'curso:2026-11': 12.5 } }
+assert(monthReport(courseFine, '2026-11').additionalTotal === 212.5 && monthReport(courseFine, '2026-11').additionalPaid === 212.5, 'juros do adicional entram só no mês pago')
+assert(monthReport(courseFine, '2026-10').additionalTotal === 200, 'outro mês do adicional fica no principal')
+assert(monthFlow(courseFine, '2026-11').expense === 212.5, 'juros do adicional saem da conta naquele mês')
 assert(!additionalApplies(course.additionalExpenses[0], '2027-01'), 'depois do fim o adicional não vale mais')
 const schoolLate = overdueItems(school, parseDate('2026-12-20'))
 assert(!schoolLate.some((item) => item.month === '2026-10'), 'fixo não fica vencido antes de começar')
@@ -193,6 +197,9 @@ assert(invoiceForCard(card, [], 2026, 10, {}, recurring.companyEntries).total ==
 assert(limitUsed(card, recurring, parseDate('2026-10-20')) === 240, 'recorrente ocupa o limite até a fatura aberta')
 const recurringPaid = { ...recurring, paidInvoices: { 'card-1:2026-10': true as const } }
 assert(limitUsed(card, recurringPaid, parseDate('2026-10-20')) === 120, 'fatura paga libera a ocorrência daquele mês')
+const recurringFine = { ...recurringPaid, invoiceSurcharges: { 'card-1:2026-10': 8 } }
+assert(monthReport(recurringFine, '2026-10').invoiceTotal === 128 && monthReport(recurringFine, '2026-10').invoicePaid === 128, 'juros da fatura entram no mês pago')
+assert(monthFlow(recurringFine, '2026-10').expense === 128, 'juros da fatura saem da conta naquele mês')
 
 const late = overdueItems(household, parseDate('2026-10-20'))
 assert(late.some((item) => item.expenseId === 'aluguel' && item.month === '2026-10'), 'aluguel de outubro vencido entra na gestão')

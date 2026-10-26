@@ -1,16 +1,18 @@
 import { useState } from 'react'
-import { PayFixedDialog } from '../components/dialogs.tsx'
+import { PayFixedDialog, SettleDialog } from '../components/dialogs.tsx'
 import { ExpenseMark } from '../components/ExpenseIcon.tsx'
 import { EmptyState, PageIntro, Panel } from '../components/ui.tsx'
 import { formatShort, monthKey, monthTitle } from '../lib/dates.ts'
 import { overdueItems, type OverdueItem } from '../lib/finance.ts'
 import { formatBRL, round2 } from '../lib/money.ts'
-import type { FixedExpense } from '../lib/types.ts'
+import type { AdditionalExpense, FixedExpense } from '../lib/types.ts'
 import { useStore } from '../state.tsx'
 
 export function OverduePage() {
   const { state, today, setAdditionalPaid, toggleInvoicePaid } = useStore()
-  const [paying, setPaying] = useState<{ expense: FixedExpense; month: string } | null>(null)
+  const [payingFixed, setPayingFixed] = useState<{ expense: FixedExpense; month: string } | null>(null)
+  const [payingAdditional, setPayingAdditional] = useState<{ expense: AdditionalExpense; month: string } | null>(null)
+  const [payingInvoice, setPayingInvoice] = useState<{ cardId: string; year: number; monthIndex: number; title: string; month: string; amount: number } | null>(null)
   const items = overdueItems(state, today)
   const total = round2(items.reduce((sum, item) => sum + item.amount, 0))
   const groups = groupByMonth(items)
@@ -19,11 +21,15 @@ export function OverduePage() {
     if (item.kind === 'fixed' && item.expenseId) {
       const expense = state.fixedExpenses.find((entry) => entry.id === item.expenseId)
       if (!expense) return
-      setPaying({ expense, month: item.month })
+      setPayingFixed({ expense, month: item.month })
     }
-    if (item.kind === 'additional' && item.expenseId) setAdditionalPaid(item.expenseId, item.month, true)
+    if (item.kind === 'additional' && item.expenseId) {
+      const expense = (state.additionalExpenses ?? []).find((entry) => entry.id === item.expenseId)
+      if (!expense) return
+      setPayingAdditional({ expense, month: item.month })
+    }
     if (item.kind === 'invoice' && item.cardId != null && item.year != null && item.monthIndex != null) {
-      toggleInvoicePaid(item.cardId, item.year, item.monthIndex)
+      setPayingInvoice({ cardId: item.cardId, year: item.year, monthIndex: item.monthIndex, title: item.title, month: item.month, amount: item.amount })
     }
   }
 
@@ -81,7 +87,27 @@ export function OverduePage() {
           </p>
         </div>
       )}
-      {paying ? <PayFixedDialog expense={paying.expense} month={paying.month} onClose={() => setPaying(null)} /> : null}
+      {payingFixed ? <PayFixedDialog expense={payingFixed.expense} month={payingFixed.month} onClose={() => setPayingFixed(null)} /> : null}
+      {payingAdditional ? (
+        <SettleDialog
+          title={`Pagar ${payingAdditional.expense.name}`}
+          month={payingAdditional.month}
+          principal={payingAdditional.expense.amount}
+          confirmLabel="Saiu da conta"
+          onClose={() => setPayingAdditional(null)}
+          onConfirm={(surcharge) => setAdditionalPaid(payingAdditional.expense.id, payingAdditional.month, true, surcharge)}
+        />
+      ) : null}
+      {payingInvoice ? (
+        <SettleDialog
+          title={`Pagar ${payingInvoice.title}`}
+          month={payingInvoice.month}
+          principal={payingInvoice.amount}
+          confirmLabel="Saiu da conta"
+          onClose={() => setPayingInvoice(null)}
+          onConfirm={(surcharge) => toggleInvoicePaid(payingInvoice.cardId, payingInvoice.year, payingInvoice.monthIndex, surcharge)}
+        />
+      ) : null}
     </div>
   )
 }

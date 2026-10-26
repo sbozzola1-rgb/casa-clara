@@ -1,8 +1,9 @@
 import { useState } from 'react'
+import { SettleDialog } from '../components/dialogs.tsx'
 import { ConfirmDialog, Modal } from '../components/Modal.tsx'
 import { Button, EmptyState, Field, MoneyField, PageIntro, ToneBadge, fieldClass, toneLabel } from '../components/ui.tsx'
 import { dateOn, dueTone, formatShort, monthKey, monthTitle, parseDate, parseMonthKey, todayISO } from '../lib/dates.ts'
-import { additionalApplies, additionalKey } from '../lib/finance.ts'
+import { additionalApplies, additionalKey, additionalMonthAmount, additionalSurcharge } from '../lib/finance.ts'
 import { formatBRL, formatInput, parseMoney, uid } from '../lib/money.ts'
 import type { AdditionalExpense } from '../lib/types.ts'
 import { useStore } from '../state.tsx'
@@ -11,14 +12,15 @@ export function AdditionalPage() {
   const { state, month, today, upsertAdditional, removeAdditional, setAdditionalPaid } = useStore()
   const [editing, setEditing] = useState<AdditionalExpense | null | 'new'>(null)
   const [removing, setRemoving] = useState<AdditionalExpense | null>(null)
+  const [paying, setPaying] = useState<AdditionalExpense | null>(null)
   const { year, monthIndex } = parseMonthKey(month)
   const selected = year * 12 + monthIndex
   const expenses = state.additionalExpenses ?? []
   const current = expenses.filter((expense) => additionalApplies(expense, month)).sort(byDue)
   const later = expenses.filter((expense) => monthSerial(expense.startDate) > selected).sort(byDue)
   const finished = expenses.filter((expense) => monthSerial(expense.endDate) < selected).sort(byDue)
-  const total = current.reduce((sum, expense) => sum + expense.amount, 0)
-  const paid = current.reduce((sum, expense) => sum + (state.paidAdditional?.[additionalKey(expense.id, month)] ? expense.amount : 0), 0)
+  const total = current.reduce((sum, expense) => sum + additionalMonthAmount(expense, state, month), 0)
+  const paid = current.reduce((sum, expense) => sum + (state.paidAdditional?.[additionalKey(expense.id, month)] ? additionalMonthAmount(expense, state, month) : 0), 0)
 
   return (
     <div>
@@ -56,7 +58,10 @@ export function AdditionalPage() {
                     className="h-4 w-4 accent-moss"
                     checked={isPaid}
                     aria-label={`Marcar ${expense.name} como pago`}
-                    onChange={() => setAdditionalPaid(expense.id, month, !isPaid)}
+                    onChange={() => {
+                      if (isPaid) setAdditionalPaid(expense.id, month, false)
+                      else setPaying(expense)
+                    }}
                   />
                 </label>
                 <button type="button" onClick={() => setEditing(expense)} className="min-w-0 flex-1 text-left">
@@ -67,10 +72,11 @@ export function AdditionalPage() {
                   <span className="mt-1 block text-xs text-ink-soft">
                     Vence {formatShort(due)} · até {monthTitle(monthKey(parseDate(expense.endDate)))}
                     {last ? ' · último mês' : ''}
+                    {additionalSurcharge(state, expense.id, month) > 0 ? ` · juros e multa ${formatBRL(additionalSurcharge(state, expense.id, month))}` : ''}
                     {expense.notes ? ` · ${expense.notes}` : ''}
                   </span>
                 </button>
-                <span className="font-medium tabular-nums">{formatBRL(expense.amount)}</span>
+                <span className="font-medium tabular-nums">{formatBRL(additionalMonthAmount(expense, state, month))}</span>
               </li>
             )
           })}
@@ -91,6 +97,16 @@ export function AdditionalPage() {
             setEditing(null)
             setRemoving(expense)
           }}
+        />
+      ) : null}
+      {paying ? (
+        <SettleDialog
+          title={`Pagar ${paying.name}`}
+          month={month}
+          principal={paying.amount}
+          confirmLabel="Saiu da conta"
+          onClose={() => setPaying(null)}
+          onConfirm={(surcharge) => setAdditionalPaid(paying.id, month, true, surcharge)}
         />
       ) : null}
       {removing ? (

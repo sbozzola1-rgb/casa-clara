@@ -323,6 +323,71 @@ export function PayFixedDialog({ expense, month, onClose }: { expense: FixedExpe
   )
 }
 
+export function SettleDialog({
+  title,
+  month,
+  principal,
+  confirmLabel,
+  onClose,
+  onConfirm,
+}: {
+  title: string
+  month: string
+  principal: number
+  confirmLabel: string
+  onClose: () => void
+  onConfirm: (surcharge: number) => void
+}) {
+  const [surcharge, setSurcharge] = useState('')
+  const [error, setError] = useState('')
+  const extra = parseMoney(surcharge) ?? 0
+  const total = round2(principal + extra)
+
+  const pay = () => {
+    if (surcharge.trim() && parseMoney(surcharge) == null) {
+      setError('O valor de juros e multa não fechou.')
+      return
+    }
+    onConfirm(extra)
+    onClose()
+  }
+
+  return (
+    <Modal
+      title={title}
+      description={`${monthTitle(month)} · principal ${formatBRL(principal)}`}
+      onClose={onClose}
+      footer={
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button onClick={pay}>{confirmLabel}</Button>
+        </div>
+      }
+    >
+      <form
+        className="space-y-4 pb-2"
+        onSubmit={(event) => {
+          event.preventDefault()
+          pay()
+        }}
+      >
+        <MoneyField
+          label="Juros e multa"
+          value={surcharge}
+          onChange={setSurcharge}
+          hint="Só neste mês. O valor dos outros meses continua o principal."
+        />
+        <p className="text-sm text-ink">
+          Neste mês sai <span className="font-medium tabular-nums">{formatBRL(total)}</span>
+        </p>
+        {error ? <p className="text-sm text-clay">{error}</p> : null}
+      </form>
+    </Modal>
+  )
+}
+
 export function CardDialog({ card, onClose }: { card: CreditCard | null; onClose: () => void }) {
   const { upsertCard, removeCard, state } = useStore()
   const [nickname, setNickname] = useState(card?.nickname ?? '')
