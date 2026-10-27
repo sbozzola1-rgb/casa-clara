@@ -5,7 +5,7 @@ import { dateKey, defaultAvatar, formatLong, TABS, type AvatarLook } from './mod
 import './routine.css'
 import { RoutineScheduler } from './scheduler.tsx'
 import { ActivityScreen, ActivityTimer, GradeScreen, HomeworkScreen, MealScreen, PixScreen, SchoolScreen, TodayScreen } from './screens.tsx'
-import { askNotificationPermission } from './sound.ts'
+import { armTabletNotices } from './notices.ts'
 import { RoutineProvider, useRoutine } from './store.tsx'
 import { Field, Modal, PinPad, TextInput } from './ui.tsx'
 
@@ -34,7 +34,7 @@ function Shell() {
 
   useEffect(() => {
     const base = import.meta.env.BASE_URL
-    if ('serviceWorker' in navigator) void navigator.serviceWorker.register(`${base}routine-sw.js`).catch(() => undefined)
+    if ('serviceWorker' in navigator) void navigator.serviceWorker.register(`${base}routine-sw.js?v=2`).catch(() => undefined)
     const link = document.createElement('link')
     link.rel = 'manifest'
     link.href = `${base}rotina.webmanifest`
@@ -489,7 +489,13 @@ function Settings({ onClose, onChangePin }: { onClose: () => void; onChangePin: 
         <button type="button" className="btn-ghost" onClick={onChangePin}>
           Trocar o PIN
         </button>
-        <button type="button" className="btn-soft" onClick={() => void askNotificationPermission()}>
+        <button
+          type="button"
+          className="btn-soft"
+          onClick={() => {
+            void armTabletNotices().then((ok) => notify(ok ? 'Avisos ligados neste tablet' : 'Não consegui ligar os avisos'))
+          }}
+        >
           Ativar avisos neste tablet
         </button>
         <button

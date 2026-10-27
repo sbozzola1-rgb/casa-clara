@@ -53,7 +53,11 @@ interface RoutineStore {
   markNotified: (key: string) => void
   replaceState: (input: unknown) => void
   timer: ActivityItem | null
+  timerEndsAt: number | null
+  timerLeft: number
   playTimer: (item: ActivityItem) => void
+  pauseTimer: (left: number) => void
+  resumeTimer: () => void
   closeTimer: () => void
   cloudChecked: boolean
   linked: boolean
@@ -63,6 +67,20 @@ interface RoutineStore {
 
 const RoutineContext = createContext<RoutineStore | null>(null)
 const REV_KEY = 'casa-clara.rotina.rev'
+const TIMER_KEY = 'casa-clara.rotina.running'
+
+function readRunning(): { item: ActivityItem; endsAt: number | null; left: number } | null {
+  try {
+    const raw = JSON.parse(localStorage.getItem(TIMER_KEY) || 'null') as { item?: ActivityItem; endsAt?: unknown; left?: unknown } | null
+    if (!raw?.item || typeof raw.item.id !== 'string' || typeof raw.item.title !== 'string') return null
+    const endsAt = typeof raw.endsAt === 'number' ? raw.endsAt : null
+    const left = typeof raw.left === 'number' ? raw.left : 0
+    if (endsAt != null && endsAt < Date.now() - 12 * 60 * 60 * 1000) return null
+    return { item: raw.item, endsAt, left }
+  } catch {
+    return null
+  }
+}
 
 function readRev() {
   try {
@@ -109,7 +127,10 @@ export function RoutineProvider({ children }: { children: ReactNode }) {
   const [tab, setTab] = useState<TabId>('hoje')
   const [toast, setToast] = useState<string | null>(null)
   const [today] = useState(() => new Date())
-  const [timer, setTimer] = useState<ActivityItem | null>(null)
+  const restored = useState(readRunning)[0]
+  const [timer, setTimer] = useState<ActivityItem | null>(restored?.item ?? null)
+  const [timerEndsAt, setTimerEndsAt] = useState<number | null>(restored?.endsAt ?? null)
+  const [timerLeft, setTimerLeft] = useState(restored?.left ?? 0)
   const [cloudChecked, setCloudChecked] = useState(false)
   const [linked, setLinked] = useState(false)
   const [houseMessage, setHouseMessage] = useState<string | null>(null)
@@ -147,6 +168,14 @@ export function RoutineProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     saveRoutine(state)
   }, [state])
+
+  useEffect(() => {
+    if (!timer) {
+      localStorage.removeItem(TIMER_KEY)
+      return
+    }
+    localStorage.setItem(TIMER_KEY, JSON.stringify({ item: timer, endsAt: timerEndsAt, left: timerLeft }))
+  }, [timer, timerEndsAt, timerLeft])
 
   useEffect(() => {
     let cancel = false
@@ -300,10 +329,25 @@ export function RoutineProvider({ children }: { children: ReactNode }) {
     markRung: (key) => patch((current) => (current.rung[key] ? current : { ...current, rung: { ...current.rung, [key]: true } })),
     markNotified: (key) => patch((current) => (current.notified[key] ? current : { ...current, notified: { ...current.notified, [key]: true } })),
     timer,
+    timerEndsAt,
+    timerLeft,
     playTimer: (item) => {
-      if (item.timerMinutes > 0) setTimer(item)
+      if (item.timerMinutes <= 0) return
+      const left = item.timerMinutes * 60
+      setTimer(item)
+      setTimerLeft(left)
+      setTimerEndsAt(Date.now() + left * 1000)
     },
-    closeTimer: () => setTimer(null),
+    pauseTimer: (left) => {
+      setTimerEndsAt(null)
+      setTimerLeft(Math.max(0, Math.round(left)))
+    },
+    resumeTimer: () => setTimerEndsAt(Date.now() + Math.max(1, timerLeft) * 1000),
+    closeTimer: () => {
+      setTimer(null)
+      setTimerEndsAt(null)
+      setTimerLeft(0)
+    },
     cloudChecked,
     linked,
     houseMessage,
@@ -313,7 +357,7 @@ export function RoutineProvider({ children }: { children: ReactNode }) {
       if (!next.profile) throw new Error('arquivo')
       setState(next)
     },
-  }), [cloudChecked, houseMessage, linkHouse, linked, notify, patch, replaceList, role, state, tab, timer, toast, today])
+  }), [cloudChecked, houseMessage, linkHouse, linked, notify, patch, replaceList, role, state, tab, timer, timerEndsAt, timerLeft, toast, today])
 
   return <RoutineContext.Provider value={value}>{children}</RoutineContext.Provider>
 }

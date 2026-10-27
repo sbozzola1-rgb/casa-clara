@@ -28,7 +28,8 @@ import {
   type MealItem,
   type SchoolItem,
 } from './model.ts'
-import { askNotificationPermission, playFinish, playPop } from './sound.ts'
+import { armTabletNotices } from './notices.ts'
+import { notifyDevice, playFinish, playPop } from './sound.ts'
 import { useRoutine } from './store.tsx'
 import { DayField, EmptyState, EmojiField, Field, FormModal, ItemCard, Modal, TextInput, ToggleRow } from './ui.tsx'
 
@@ -95,40 +96,54 @@ function TimerPlay({ item }: { item: ActivityItem }) {
   const { playTimer } = useRoutine()
   if (item.timerMinutes <= 0) return null
   return (
-    <button type="button" className="btn-soft mt-2" onClick={() => playTimer(item)}>
+    <button
+      type="button"
+      className="btn-soft mt-2"
+      onClick={() => {
+        void armTabletNotices()
+        playTimer(item)
+      }}
+    >
       Play · {item.timerMinutes} min
     </button>
   )
 }
 
 export function ActivityTimer() {
-  const { timer, closeTimer } = useRoutine()
-  const total = (timer?.timerMinutes ?? 0) * 60
-  const [left, setLeft] = useState(total)
-  const [paused, setPaused] = useState(false)
-  const endsAt = useRef(0)
+  const { timer, timerEndsAt, timerLeft, closeTimer, pauseTimer, resumeTimer } = useRoutine()
+  const [left, setLeft] = useState(timerLeft)
+  const [paused, setPaused] = useState(timer != null && timerEndsAt == null)
   const finished = useRef(false)
 
   useEffect(() => {
-    if (!timer) return
-    finished.current = false
+    if (!timer) {
+      finished.current = false
+      return
+    }
+    const done = timerEndsAt != null && timerEndsAt <= Date.now()
+    finished.current = done
+    if (timerEndsAt == null) {
+      setPaused(true)
+      setLeft(timerLeft)
+      return
+    }
     setPaused(false)
-    setLeft(timer.timerMinutes * 60)
-    endsAt.current = Date.now() + timer.timerMinutes * 60 * 1000
-  }, [timer])
+    setLeft(done ? 0 : Math.max(0, Math.round((timerEndsAt - Date.now()) / 1000)))
+  }, [timer, timerEndsAt, timerLeft])
 
   useEffect(() => {
-    if (!timer || paused) return
-    const tick = () => setLeft(Math.max(0, Math.round((endsAt.current - Date.now()) / 1000)))
+    if (!timer || paused || timerEndsAt == null) return
+    const tick = () => setLeft(Math.max(0, Math.round((timerEndsAt - Date.now()) / 1000)))
     tick()
     const id = window.setInterval(tick, 250)
     return () => window.clearInterval(id)
-  }, [paused, timer])
+  }, [paused, timer, timerEndsAt])
 
   useEffect(() => {
     if (!timer || left > 0 || finished.current) return
     finished.current = true
     playFinish()
+    void notifyDevice(timer.title, 'Acabou o tempo!', `timer-${timer.id}`)
   }, [left, timer])
 
   useEffect(() => {
@@ -147,6 +162,7 @@ export function ActivityTimer() {
   }, [timer])
 
   if (!timer) return null
+  const total = timer.timerMinutes * 60
   const minutes = Math.floor(left / 60)
   const seconds = String(left % 60).padStart(2, '0')
   const done = left <= 0
@@ -169,10 +185,8 @@ export function ActivityTimer() {
               type="button"
               className="btn-soft"
               onClick={() => {
-                if (paused) {
-                  endsAt.current = Date.now() + left * 1000
-                  setPaused(false)
-                } else setPaused(true)
+                if (paused) resumeTimer()
+                else pauseTimer(left)
               }}
             >
               {paused ? 'Continuar' : 'Pausar'}
@@ -247,7 +261,7 @@ function CreateAlarmButton({ kind }: { kind: 'activity' | 'meal' | 'homework' })
       enabled: true,
       on: kind === 'homework' && 'due' in picked ? picked.due : '',
     })
-    void askNotificationPermission()
+    void armTabletNotices()
     notify('Despertador criado')
     setOpen(false)
   }
@@ -279,6 +293,29 @@ function CreateAlarmButton({ kind }: { kind: 'activity' | 'meal' | 'homework' })
         </FormModal>
       ) : null}
     </>
+  )
+}
+
+function NoticeSwitch() {
+  const { notify } = useRoutine()
+  const [permission, setPermission] = useState(() => (typeof Notification === 'undefined' ? 'unsupported' : Notification.permission))
+  if (permission !== 'default') return null
+  return (
+    <div className="mt-4">
+      <button
+        type="button"
+        className="btn-soft"
+        onClick={() => {
+          void armTabletNotices().then((ok) => {
+            setPermission(typeof Notification === 'undefined' ? 'unsupported' : Notification.permission)
+            notify(ok ? 'Avisos ligados neste tablet' : 'Não consegui ligar os avisos')
+          })
+        }}
+      >
+        Ativar avisos
+      </button>
+      <p className="mt-2 text-sm font-bold text-[var(--soft)]">O despertador e o timer tocam mesmo com a rotina fechada.</p>
+    </div>
   )
 }
 
@@ -338,6 +375,7 @@ export function TodayScreen() {
         <p className="text-sm font-extrabold tracking-wide text-[var(--soft)] uppercase">{formatLong(today)}</p>
         <h1 className="font-display mt-1 text-4xl md:text-5xl">Oi, {role === 'parent' ? 'mamãe' : profile?.name}!</h1>
         <p className="mt-2 text-[var(--soft)]">{pending.length === 0 ? 'Nada pendente por aqui.' : `Ainda ${pending.length === 1 ? 'falta' : 'faltam'} ${pending.length} · ${finished.length} ${finished.length === 1 ? 'feita' : 'feitas'}`}</p>
+        <NoticeSwitch />
       </section>
 
       {exam ? (
@@ -726,7 +764,7 @@ export function ActivityScreen() {
       pixAmount: draft.pixEnabled ? draft.pixAmount : 0,
       timerMinutes: draft.timerMinutes > 0 ? Math.min(180, Math.max(1, Math.round(draft.timerMinutes))) : 0,
     })
-    if (draft.notify) void askNotificationPermission()
+    if (draft.notify) void armTabletNotices()
     setDraft(null)
   }
 

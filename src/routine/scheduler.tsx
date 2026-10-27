@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { activityOccurs, alarmOnDay, dateKey, eventKey, isDue, type ActivityItem, type AlarmItem } from './model.ts'
+import { armTabletNotices, collectNotices, syncNotices } from './notices.ts'
 import { notifyDevice, startAlarmSound, stopAlarmSound, unlockAudio } from './sound.ts'
 import { useRoutine } from './store.tsx'
 
 const seen = new Set<string>()
 
 export function RoutineScheduler() {
-  const { state, markRung, markNotified, setTab } = useRoutine()
+  const { state, markRung, markNotified, setTab, timer, timerEndsAt } = useRoutine()
   const [alarms, setAlarms] = useState<AlarmItem[] | null>(null)
   const [activity, setActivity] = useState<ActivityItem | null>(null)
 
@@ -52,9 +53,29 @@ export function RoutineScheduler() {
     }
 
     tick()
-    const timer = window.setInterval(tick, 1000)
-    return () => window.clearInterval(timer)
+    const timerId = window.setInterval(tick, 1000)
+    return () => window.clearInterval(timerId)
   }, [markNotified, markRung, state.activities, state.alarms, state.notified, state.rung])
+
+  useEffect(() => {
+    let cancel = false
+    const publish = () => {
+      if (!cancel) void syncNotices(collectNotices(state, timer, timerEndsAt, new Date()))
+    }
+    const start = () => {
+      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+      void armTabletNotices().then((ok) => {
+        if (!cancel && ok) publish()
+      })
+    }
+    const id = window.setTimeout(start, 400)
+    window.addEventListener('rotina-armed', publish)
+    return () => {
+      cancel = true
+      window.clearTimeout(id)
+      window.removeEventListener('rotina-armed', publish)
+    }
+  }, [state, timer, timerEndsAt])
 
   return (
     <>
@@ -73,7 +94,7 @@ export function RoutineScheduler() {
                 setAlarms(null)
               }}
             >
-              Já acordei!
+              Parar
             </button>
           </div>
         </div>
