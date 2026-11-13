@@ -100,7 +100,7 @@ export type RoutineState = {
   notified: Record<string, true>
 }
 
-export type TabId = 'hoje' | 'escola' | 'licao' | 'atividades' | 'refeicoes' | 'notas' | 'pix'
+export type TabId = 'hoje' | 'escola' | 'licao' | 'atividades' | 'refeicoes' | 'notas' | 'pix' | 'laurinha'
 
 export const TABS: { id: TabId; label: string; emoji: string }[] = [
   { id: 'hoje', label: 'Hoje', emoji: '🌸' },
@@ -110,6 +110,7 @@ export const TABS: { id: TabId; label: string; emoji: string }[] = [
   { id: 'refeicoes', label: 'Refeições', emoji: '🍎' },
   { id: 'notas', label: 'Notas', emoji: '🌈' },
   { id: 'pix', label: 'Pix', emoji: '💖' },
+  { id: 'laurinha', label: 'Laurinha', emoji: '💬' },
 ]
 
 export const WEEKDAYS = [

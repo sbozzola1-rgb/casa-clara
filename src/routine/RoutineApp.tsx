@@ -4,6 +4,8 @@ import { pinRoutine, routinePinned } from './door.ts'
 import { dateKey, defaultAvatar, formatLong, TABS, type AvatarLook } from './model.ts'
 import './routine.css'
 import { RoutineScheduler } from './scheduler.tsx'
+import { LaurinhaScreen } from './LaurinhaScreen.tsx'
+import { readAgentKey, saveAgentKey } from './laurinha.ts'
 import { ActivityScreen, ActivityTimer, GradeScreen, HomeworkScreen, MealScreen, PixScreen, SchoolScreen, TodayScreen } from './screens.tsx'
 import { armTabletNotices } from './notices.ts'
 import { RoutineProvider, useRoutine } from './store.tsx'
@@ -155,6 +157,7 @@ function Shell() {
           {tab === 'refeicoes' ? <MealScreen /> : null}
           {tab === 'notas' ? <GradeScreen /> : null}
           {tab === 'pix' ? <PixScreen /> : null}
+          {tab === 'laurinha' ? <LaurinhaScreen /> : null}
         </main>
       </div>
 
@@ -430,6 +433,7 @@ function Settings({ onClose, onChangePin }: { onClose: () => void; onChangePin: 
   const [pass, setPass] = useState(profile?.pass ?? '')
   const [look, setLook] = useState<AvatarLook>(profile?.avatar ?? defaultAvatar())
   const [pinned, setPinned] = useState(routinePinned)
+  const [agentKey, setAgentKey] = useState(readAgentKey)
 
   if (!profile) return null
 
@@ -461,7 +465,7 @@ function Settings({ onClose, onChangePin }: { onClose: () => void; onChangePin: 
   return (
     <Modal
       title="Ajustes"
-      description="Nome, avatar, PIN e este tablet."
+      description="Nome, avatar, PIN, a voz da Laurinha e este tablet."
       onClose={onClose}
       footer={
         <>
@@ -486,6 +490,20 @@ function Settings({ onClose, onChangePin }: { onClose: () => void; onChangePin: 
         </Field>
         <p className="-mt-2 text-sm font-bold text-[var(--soft)]">É a senha que ela digita para abrir a rotina. Não é a sua.</p>
         <AvatarStudio look={look} onChange={setLook} />
+        <Field label="Chave da Laurinha">
+          <TextInput type="password" autoComplete="off" value={agentKey} onChange={(event) => setAgentKey(event.target.value)} />
+        </Field>
+        <p className="-mt-2 text-sm font-bold text-[var(--soft)]">Fica só neste tablet. Não entra na cópia da rotina nem na nuvem da casa. Com ela, a Laurinha explica qualquer pergunta. Sem ela, explica a rotina.</p>
+        <button
+          type="button"
+          className="btn-soft"
+          onClick={() => {
+            saveAgentKey(agentKey)
+            notify(agentKey.trim() ? 'A Laurinha já explica o mundo neste tablet' : 'A Laurinha ficou só com a rotina')
+          }}
+        >
+          Guardar a chave neste tablet
+        </button>
         <button type="button" className="btn-ghost" onClick={onChangePin}>
           Trocar o PIN
         </button>
