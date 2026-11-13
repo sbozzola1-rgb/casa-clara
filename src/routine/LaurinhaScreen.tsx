@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { askLaurinha, loadChat, saveChat, type ChatTurn } from './laurinha.ts'
+import { askLaurinha, loadChat, readAgentKey, saveChat, voiceNag, type ChatTurn } from './laurinha.ts'
 import { useRoutine } from './store.tsx'
 
 const IDEAS = ['O que eu tenho hoje?', 'Por que o céu é azul?', 'Me explica o que é uma fração']
@@ -7,7 +7,10 @@ const IDEAS = ['O que eu tenho hoje?', 'Por que o céu é azul?', 'Me explica o 
 export function LaurinhaScreen() {
   const { state, today } = useRoutine()
   const name = state.profile?.name.trim() || 'Laura'
-  const [turns, setTurns] = useState<ChatTurn[]>(() => loadChat())
+  const [turns, setTurns] = useState<ChatTurn[]>(() => {
+    const saved = loadChat()
+    return readAgentKey() ? saved.filter((turn) => !voiceNag(turn.text)) : saved
+  })
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const bottom = useRef<HTMLDivElement>(null)

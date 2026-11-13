@@ -10,7 +10,13 @@ import {
 
 const KEY_STORE = 'casa-clara.rotina.laurinha-key'
 const CHAT_STORE = 'casa-clara.rotina.laurinha-chat'
-const MODEL = 'gemini-2.5-flash'
+const MODELS: { name: string; generationConfig: Record<string, unknown> }[] = [
+  { name: 'gemini-flash-lite-latest', generationConfig: { temperature: 0.6, maxOutputTokens: 500 } },
+  {
+    name: 'gemini-3.5-flash',
+    generationConfig: { temperature: 0.6, maxOutputTokens: 500, thinkingConfig: { thinkingBudget: 0 } },
+  },
+]
 
 export type ChatTurn = { role: 'user' | 'model'; text: string }
 
@@ -139,6 +145,7 @@ function systemPrompt(name: string, facts: string) {
     'Se a pergunta for de gente grande, sobre sexo, violência, se machucar, drogas ou armas, diga com calma que isso é assunto da mamãe.',
     'Não dê passo a passo de nada perigoso.',
     'Se ela estiver triste ou com medo, seja gentil e diga para chamar a mamãe ou um adulto de confiança.',
+    'Sua voz já está ligada. Nunca peça para ativar, ligar ou guardar voz, chave ou ajuste.',
     '',
     'Fatos:',
     facts,
@@ -151,35 +158,48 @@ type GeminiResponse = {
   error?: { message?: string }
 }
 
+export function voiceNag(text: string) {
+  return /ligar a minha voz|ativar a voz|guard(ar|e) a chave|ajustes deste tablet/i.test(text)
+}
+
 async function askModel(question: string, history: ChatTurn[], name: string, facts: string, key: string) {
-  const contents = [...history.slice(-8), { role: 'user' as const, text: question }].map((turn) => ({
+  const remembered = history.filter((turn) => !voiceNag(turn.text)).slice(-8)
+  const contents = [...remembered, { role: 'user' as const, text: question }].map((turn) => ({
     role: turn.role,
     parts: [{ text: turn.text }],
   }))
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${encodeURIComponent(key)}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemPrompt(name, facts) }] },
-        contents,
-        generationConfig: { temperature: 0.6, maxOutputTokens: 500 },
-        safetySettings: [
-          { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-          { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-          { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_LOW_AND_ABOVE' },
-          { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-        ],
-      }),
-    },
-  )
-  const data = (await response.json()) as GeminiResponse
-  if (data.promptFeedback?.blockReason || data.candidates?.[0]?.finishReason === 'SAFETY') return grownUpReply(name)
-  const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('').trim()
-  if (text) return text
-  if (!response.ok) throw new Error(data.error?.message || 'sem resposta')
-  return `${name}, eu travei nessa. Pergunta de outro jeito, ou chama a mamãe.`
+  let lastStatus = 0
+  for (const model of MODELS) {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model.name}:generateContent?key=${encodeURIComponent(key)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt(name, facts) }] },
+          contents,
+          generationConfig: model.generationConfig,
+          safetySettings: [
+            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_LOW_AND_ABOVE' },
+            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+          ],
+        }),
+      },
+    )
+    const data = (await response.json()) as GeminiResponse
+    if (data.promptFeedback?.blockReason || data.candidates?.[0]?.finishReason === 'SAFETY') return grownUpReply(name)
+    const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('').trim()
+    if (text) return text
+    lastStatus = response.status
+    if (response.ok) return `${name}, eu travei nessa. Pergunta de outro jeito, ou chama a mamãe.`
+    if (response.status !== 404 && response.status !== 429 && response.status !== 503) break
+  }
+  if (lastStatus === 404 || lastStatus === 429 || lastStatus === 503) {
+    return `${name}, a minha voz de explicar o mundo está cheia agora. Tenta de novo daqui a pouquinho.`
+  }
+  throw new Error('sem resposta')
 }
 
 export async function askLaurinha(question: string, history: ChatTurn[], state: RoutineState, date: Date) {
